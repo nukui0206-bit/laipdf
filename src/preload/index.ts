@@ -1,16 +1,22 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
-// Custom APIs for renderer
-const api = {}
+const laipdf = {
+  file: {
+    savePdf: (
+      bytes: Uint8Array,
+      suggestedName: string
+    ): Promise<{ saved: boolean; path?: string }> =>
+      ipcRenderer.invoke('file:save-pdf', bytes, suggestedName),
+    openPdf: (): Promise<{ canceled: boolean; path?: string; bytes?: Uint8Array }> =>
+      ipcRenderer.invoke('file:open-pdf')
+  }
+}
 
-// Use `contextBridge` APIs to expose Electron APIs to
-// renderer only if context isolation is enabled, otherwise
-// just add to the DOM global.
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI)
-    contextBridge.exposeInMainWorld('api', api)
+    contextBridge.exposeInMainWorld('laipdf', laipdf)
   } catch (error) {
     console.error(error)
   }
@@ -18,5 +24,7 @@ if (process.contextIsolated) {
   // @ts-ignore (define in dts)
   window.electron = electronAPI
   // @ts-ignore (define in dts)
-  window.api = api
+  window.laipdf = laipdf
 }
+
+export type LaiPdfAPI = typeof laipdf
