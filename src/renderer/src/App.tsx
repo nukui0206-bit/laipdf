@@ -6,8 +6,9 @@ import { PdfViewer } from './components/PdfViewer';
 import { PageList } from './components/PageList';
 import { DropZone } from './components/DropZone';
 import { StampManager } from './components/StampManager';
+import { TextInputDialog } from './components/TextInputDialog';
 import type { StampMeta } from '../../preload';
-import { deletePage, rotatePage, reorderPages, stampOnPage } from './services/pdfService';
+import { deletePage, rotatePage, reorderPages, stampOnPage, addText } from './services/pdfService';
 
 function App(): React.JSX.Element {
   const [pdfBytes, setPdfBytes] = useState<Uint8Array | null>(null);
@@ -17,6 +18,12 @@ function App(): React.JSX.Element {
   const [isDirty, setIsDirty] = useState(false);
   const [stampModalOpen, setStampModalOpen] = useState(false);
   const [stampMode, setStampMode] = useState<StampMeta | null>(null);
+  const [textMode, setTextMode] = useState(false);
+  const [pendingTextSpot, setPendingTextSpot] = useState<{
+    pageIndex: number;
+    xPt: number;
+    yPt: number;
+  } | null>(null);
 
   const handleFile = async (file: File): Promise<void> => {
     const buffer = await file.arrayBuffer();
@@ -84,6 +91,37 @@ function App(): React.JSX.Element {
     } catch (err) {
       console.error(err);
       toast.error('回転に失敗しました');
+    }
+  };
+
+  const handleTextPlaced = (pageIndex: number, xPt: number, yPt: number): void => {
+    setPendingTextSpot({ pageIndex, xPt, yPt });
+  };
+
+  const handleTextSubmit = async (
+    text: string,
+    fontSize: number,
+    color: { r: number; g: number; b: number },
+  ): Promise<void> => {
+    if (!pdfBytes || !pendingTextSpot) return;
+    try {
+      const updated = await addText(
+        pdfBytes,
+        pendingTextSpot.pageIndex,
+        text,
+        pendingTextSpot.xPt,
+        pendingTextSpot.yPt,
+        fontSize,
+        color,
+      );
+      setPdfBytes(updated);
+      setIsDirty(true);
+      toast.success('テキストを追加しました');
+    } catch (err) {
+      console.error(err);
+      toast.error('テキスト追加に失敗しました');
+    } finally {
+      setPendingTextSpot(null);
     }
   };
 
@@ -155,6 +193,26 @@ function App(): React.JSX.Element {
             </button>
             {pdfBytes && (
               <>
+                {textMode ? (
+                  <button
+                    type="button"
+                    onClick={() => setTextMode(false)}
+                    className="px-3 py-1.5 text-sm bg-blue-100 hover:bg-blue-200 text-blue-700 rounded font-medium"
+                  >
+                    ✕ テキスト解除
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStampMode(null);
+                      setTextMode(true);
+                    }}
+                    className="px-3 py-1.5 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 rounded font-medium"
+                  >
+                    ✏ テキスト追加
+                  </button>
+                )}
                 {stampMode ? (
                   <button
                     type="button"
@@ -166,7 +224,10 @@ function App(): React.JSX.Element {
                 ) : (
                   <button
                     type="button"
-                    onClick={() => setStampModalOpen(true)}
+                    onClick={() => {
+                      setTextMode(false);
+                      setStampModalOpen(true);
+                    }}
                     className="px-3 py-1.5 text-sm bg-orange-50 hover:bg-orange-100 text-orange-700 rounded font-medium"
                   >
                     🖌 押印する
@@ -213,7 +274,9 @@ function App(): React.JSX.Element {
                   onPageChange={setCurrentPage}
                   onTotalPagesChange={handleTotalPagesChange}
                   stampMode={stampMode}
+                  textMode={textMode}
                   onStampPlaced={handleStampPlaced}
+                  onTextPlaced={handleTextPlaced}
                 />
               </div>
             </div>
@@ -236,6 +299,11 @@ function App(): React.JSX.Element {
           onClose={() => setStampModalOpen(false)}
           onSelect={(s) => setStampMode(s)}
           selectedId={stampMode?.id ?? null}
+        />
+        <TextInputDialog
+          open={pendingTextSpot !== null}
+          onClose={() => setPendingTextSpot(null)}
+          onSubmit={handleTextSubmit}
         />
       </div>
     </DndProvider>

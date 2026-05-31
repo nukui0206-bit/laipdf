@@ -7,6 +7,17 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
 const STAMPS_DIR = join(app.getPath('userData'), 'stamps')
+const FONTS_DIR = join(app.getPath('userData'), 'fonts')
+// フル版 OTF (約 16MB、日本語全文字含む)
+const JP_FONT_FILE = join(FONTS_DIR, 'NotoSansCJKjp-Regular.otf')
+const JP_FONT_URL =
+  'https://cdn.jsdelivr.net/gh/googlefonts/noto-cjk@main/Sans/OTF/Japanese/NotoSansCJKjp-Regular.otf'
+
+async function ensureFontsDir(): Promise<void> {
+  if (!existsSync(FONTS_DIR)) {
+    await mkdir(FONTS_DIR, { recursive: true })
+  }
+}
 
 async function ensureStampsDir(): Promise<void> {
   if (!existsSync(STAMPS_DIR)) {
@@ -78,6 +89,31 @@ app.whenReady().then(() => {
       return { saved: true, path: result.filePath }
     }
   )
+
+  // ===== Fonts IPC =====
+  ipcMain.handle('fonts:get-jp', async (): Promise<Uint8Array | null> => {
+    try {
+      await ensureFontsDir()
+      if (existsSync(JP_FONT_FILE)) {
+        const buf = await readFile(JP_FONT_FILE)
+        return new Uint8Array(buf)
+      }
+      // 初回: CDN からダウンロード
+      const res = await fetch(JP_FONT_URL)
+      if (!res.ok) {
+        console.error('[fonts:get-jp] HTTP', res.status)
+        return null
+      }
+      const arrayBuf = await res.arrayBuffer()
+      const buf = Buffer.from(arrayBuf)
+      await writeFile(JP_FONT_FILE, buf)
+      console.log('[fonts:get-jp] downloaded', buf.byteLength, 'bytes')
+      return new Uint8Array(buf)
+    } catch (err) {
+      console.error('[fonts:get-jp] error', err)
+      return null
+    }
+  })
 
   // ===== Stamps IPC =====
   ipcMain.handle(

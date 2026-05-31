@@ -19,6 +19,9 @@ const laipdf = {
     openPdf: (): Promise<{ canceled: boolean; path?: string; bytes?: Uint8Array }> =>
       ipcRenderer.invoke('file:open-pdf')
   },
+  fonts: {
+    getJp: (): Promise<Uint8Array | null> => ipcRenderer.invoke('fonts:get-jp')
+  },
   stamps: {
     list: (): Promise<StampMeta[]> => ipcRenderer.invoke('stamps:list'),
     pickImage: (): Promise<{ canceled: boolean; bytes?: Uint8Array; name?: string }> =>

@@ -11,7 +11,9 @@ interface PdfViewerProps {
   onPageChange: (page: number) => void;
   onTotalPagesChange: (n: number) => void;
   stampMode: StampMeta | null;
+  textMode: boolean;
   onStampPlaced: (pageIndex: number, xPt: number, yPt: number, sizePt: number) => void;
+  onTextPlaced: (pageIndex: number, xPt: number, yPt: number) => void;
 }
 
 export function PdfViewer({
@@ -20,7 +22,9 @@ export function PdfViewer({
   onPageChange,
   onTotalPagesChange,
   stampMode,
+  textMode,
   onStampPlaced,
+  onTextPlaced,
 }: PdfViewerProps): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [totalPages, setTotalPages] = useState(0);
@@ -78,16 +82,19 @@ export function PdfViewer({
   }, [pdf, pageNum, scale]);
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>): void => {
-    if (!stampMode || !pagePtSize || !canvasRef.current) return;
+    if (!pagePtSize || !canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
-    // Canvas 内の座標 (CSS px)
     const cssX = e.clientX - rect.left;
     const cssY = e.clientY - rect.top;
-    // CSS px → PDF pt (scale で割る)
     const xPt = cssX / scale;
     const yPt = cssY / scale;
-    const sizePt = 70; // 約 25mm 角
-    onStampPlaced(pageNum - 1, xPt - sizePt / 2, yPt - sizePt / 2, sizePt);
+
+    if (stampMode) {
+      const sizePt = 70;
+      onStampPlaced(pageNum - 1, xPt - sizePt / 2, yPt - sizePt / 2, sizePt);
+    } else if (textMode) {
+      onTextPlaced(pageNum - 1, xPt, yPt);
+    }
   };
 
   return (
@@ -121,6 +128,13 @@ export function PdfViewer({
             </span>
           </div>
         )}
+        {textMode && (
+          <div className="ml-4 px-3 py-1 bg-blue-50 border border-blue-300 rounded">
+            <span className="text-xs text-blue-700">
+              ✏ テキスト追加モード — PDF クリックで入力
+            </span>
+          </div>
+        )}
 
         <div className="ml-auto flex items-center gap-1">
           <button
@@ -145,7 +159,7 @@ export function PdfViewer({
         <canvas
           ref={canvasRef}
           onClick={handleCanvasClick}
-          className={`shadow-xl bg-white ${stampMode ? 'cursor-crosshair' : ''}`}
+          className={`shadow-xl bg-white ${stampMode || textMode ? 'cursor-crosshair' : ''}`}
         />
       </div>
     </div>

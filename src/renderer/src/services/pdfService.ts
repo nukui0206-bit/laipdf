@@ -1,4 +1,69 @@
-import { PDFDocument, degrees } from 'pdf-lib';
+import { PDFDocument, StandardFonts, degrees, rgb } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
+
+// 日本語フォントは初回ロード時にキャッシュ
+let cachedJpFont: ArrayBuffer | null = null;
+
+async function loadJpFont(): Promise<ArrayBuffer | null> {
+  if (cachedJpFont) return cachedJpFont;
+  try {
+    // main プロセス経由で取得 (CSP 制約を回避、キャッシュ済み)
+    const bytes = await window.laipdf.fonts.getJp();
+    if (!bytes) return null;
+    // Uint8Array → ArrayBuffer (slice で detach 防止)
+    cachedJpFont = bytes.slice().buffer;
+    console.log('[pdfService] JP font loaded', cachedJpFont.byteLength, 'bytes');
+    return cachedJpFont;
+  } catch (err) {
+    console.warn('[pdfService] JP font load failed', err);
+    return null;
+  }
+}
+
+/**
+ * PDF にテキストを追加（日本語対応、要 NotoSansJP フェッチ）
+ */
+export async function addText(
+  bytes: Uint8Array,
+  pageIndex: number,
+  text: string,
+  xFromLeft: number,
+  yFromTop: number,
+  fontSize: number,
+  color: { r: number; g: number; b: number } = { r: 0, g: 0, b: 0 },
+): Promise<Uint8Array> {
+  const pdf = await PDFDocument.load(bytes);
+  pdf.registerFontkit(fontkit);
+
+  // 日本語含むなら NotoSansJP、英数字のみなら Helvetica
+  const hasJapanese = /[　-鿿぀-ゟ゠-ヿ]/.test(text);
+  let font;
+  if (hasJapanese) {
+    const fontBytes = await loadJpFont();
+    if (fontBytes) {
+      font = await pdf.embedFont(fontBytes, { subset: true });
+    } else {
+      // フォール バック (日本語は文字化けするが配置はされる)
+      font = await pdf.embedFont(StandardFonts.Helvetica);
+    }
+  } else {
+    font = await pdf.embedFont(StandardFonts.Helvetica);
+  }
+
+  const page = pdf.getPage(pageIndex);
+  const { height: pageH } = page.getSize();
+  // pdf-lib は左下原点なので Y 変換 + フォントサイズ分上にズラす
+  const y = pageH - yFromTop - fontSize;
+  page.drawText(text, {
+    x: xFromLeft,
+    y,
+    size: fontSize,
+    font,
+    color: rgb(color.r, color.g, color.b),
+  });
+  return await pdf.save();
+}
+
 
 /**
  * 印鑑画像を PDF の指定ページ・指定座標に押す
