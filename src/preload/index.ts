@@ -17,7 +17,11 @@ const laipdf = {
     ): Promise<{ saved: boolean; path?: string }> =>
       ipcRenderer.invoke('file:save-pdf', bytes, suggestedName),
     openPdf: (): Promise<{ canceled: boolean; path?: string; bytes?: Uint8Array }> =>
-      ipcRenderer.invoke('file:open-pdf')
+      ipcRenderer.invoke('file:open-pdf'),
+    openPdfs: (): Promise<{
+      canceled: boolean
+      files?: Array<{ path: string; name: string; bytes: Uint8Array }>
+    }> => ipcRenderer.invoke('file:open-pdfs')
   },
   fonts: {
     getJp: (): Promise<Uint8Array | null> => ipcRenderer.invoke('fonts:get-jp')

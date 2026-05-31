@@ -7,8 +7,17 @@ import { PageList } from './components/PageList';
 import { DropZone } from './components/DropZone';
 import { StampManager } from './components/StampManager';
 import { TextInputDialog } from './components/TextInputDialog';
+import { SplitDialog } from './components/SplitDialog';
 import type { StampMeta } from '../../preload';
-import { deletePage, rotatePage, reorderPages, stampOnPage, addText } from './services/pdfService';
+import {
+  deletePage,
+  rotatePage,
+  reorderPages,
+  stampOnPage,
+  addText,
+  mergePdfs,
+  splitPdf,
+} from './services/pdfService';
 
 function App(): React.JSX.Element {
   const [pdfBytes, setPdfBytes] = useState<Uint8Array | null>(null);
@@ -24,6 +33,7 @@ function App(): React.JSX.Element {
     xPt: number;
     yPt: number;
   } | null>(null);
+  const [splitDialogOpen, setSplitDialogOpen] = useState(false);
 
   const handleFile = async (file: File): Promise<void> => {
     const buffer = await file.arrayBuffer();
@@ -149,6 +159,43 @@ function App(): React.JSX.Element {
     }
   };
 
+  const handleMerge = async (): Promise<void> => {
+    if (!pdfBytes) return;
+    try {
+      const picked = await window.laipdf.file.openPdfs();
+      if (picked.canceled || !picked.files || picked.files.length === 0) return;
+      const buffers = [pdfBytes, ...picked.files.map((f) => f.bytes)];
+      const merged = await mergePdfs(buffers);
+      setPdfBytes(merged);
+      setIsDirty(true);
+      const names = picked.files.map((f) => f.name).join(', ');
+      toast.success(`${picked.files.length} ファイルを末尾に結合: ${names}`);
+    } catch (err) {
+      console.error(err);
+      toast.error('結合に失敗しました');
+    }
+  };
+
+  const handleSplit = async (ranges: [number, number][]): Promise<void> => {
+    if (!pdfBytes) return;
+    try {
+      const parts = await splitPdf(pdfBytes, ranges);
+      const baseName = fileName.replace(/\.pdf$/i, '');
+      let saved = 0;
+      for (let i = 0; i < parts.length; i++) {
+        const [s, e] = ranges[i];
+        const suffix = s === e ? `${s + 1}` : `${s + 1}-${e + 1}`;
+        const suggested = `${baseName}_${suffix}.pdf`;
+        const res = await window.laipdf.file.savePdf(parts[i], suggested);
+        if (res.saved) saved++;
+      }
+      toast.success(`${saved} / ${parts.length} ファイルを保存しました`);
+    } catch (err) {
+      console.error(err);
+      toast.error('分割に失敗しました');
+    }
+  };
+
   const handleSave = async (): Promise<void> => {
     if (!pdfBytes) return;
     try {
@@ -233,6 +280,22 @@ function App(): React.JSX.Element {
                     🖌 押印する
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={handleMerge}
+                  className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded font-medium"
+                  title="他の PDF を末尾に結合"
+                >
+                  🔗 結合
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSplitDialogOpen(true)}
+                  className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded font-medium"
+                  title="ページ範囲で分割"
+                >
+                  📤 分割
+                </button>
                 <span className="text-sm text-gray-600 truncate max-w-xs ml-2">
                   {fileName}
                   {isDirty && <span className="ml-1 text-orange-500">●</span>}
@@ -304,6 +367,12 @@ function App(): React.JSX.Element {
           open={pendingTextSpot !== null}
           onClose={() => setPendingTextSpot(null)}
           onSubmit={handleTextSubmit}
+        />
+        <SplitDialog
+          open={splitDialogOpen}
+          onClose={() => setSplitDialogOpen(false)}
+          totalPages={totalPages}
+          onSubmit={handleSplit}
         />
       </div>
     </DndProvider>

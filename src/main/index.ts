@@ -200,13 +200,35 @@ app.whenReady().then(() => {
         filters: [{ name: 'PDF', extensions: ['pdf'] }]
       })
       if (result.canceled || result.filePaths.length === 0) return { canceled: true }
-      const { readFile } = await import('fs/promises')
       const buffer = await readFile(result.filePaths[0])
       return {
         canceled: false,
         path: result.filePaths[0],
         bytes: new Uint8Array(buffer)
       }
+    }
+  )
+
+  ipcMain.handle(
+    'file:open-pdfs',
+    async (): Promise<{
+      canceled: boolean
+      files?: Array<{ path: string; name: string; bytes: Uint8Array }>
+    }> => {
+      const result = await dialog.showOpenDialog({
+        title: '結合する PDF を選択（複数選択可）',
+        properties: ['openFile', 'multiSelections'],
+        filters: [{ name: 'PDF', extensions: ['pdf'] }]
+      })
+      if (result.canceled || result.filePaths.length === 0) return { canceled: true }
+      const files = await Promise.all(
+        result.filePaths.map(async (p) => ({
+          path: p,
+          name: p.split(/[\\/]/).pop() ?? 'unknown.pdf',
+          bytes: new Uint8Array(await readFile(p))
+        }))
+      )
+      return { canceled: false, files }
     }
   )
 
