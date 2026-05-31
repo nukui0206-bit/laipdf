@@ -66,6 +66,37 @@ export async function addText(
 
 
 /**
+ * 画像ファイル群から PDF を作成。
+ * 各画像 1 枚 = 1 ページ。A4 (595×842pt) に収まるよう自動スケール。
+ */
+export async function imagesToPdf(
+  images: Array<{ type: 'png' | 'jpg'; bytes: Uint8Array }>,
+): Promise<Uint8Array> {
+  const A4_W = 595.28;
+  const A4_H = 841.89;
+  const MARGIN = 20;
+  const MAX_W = A4_W - MARGIN * 2;
+  const MAX_H = A4_H - MARGIN * 2;
+
+  const pdf = await PDFDocument.create();
+  for (const img of images) {
+    const bufferCopy = img.bytes.slice();
+    const embedded =
+      img.type === 'png'
+        ? await pdf.embedPng(bufferCopy)
+        : await pdf.embedJpg(bufferCopy);
+    const scale = Math.min(MAX_W / embedded.width, MAX_H / embedded.height, 1);
+    const w = embedded.width * scale;
+    const h = embedded.height * scale;
+    const page = pdf.addPage([A4_W, A4_H]);
+    const x = (A4_W - w) / 2;
+    const y = (A4_H - h) / 2;
+    page.drawImage(embedded, { x, y, width: w, height: h });
+  }
+  return await pdf.save();
+}
+
+/**
  * 印鑑画像を PDF の指定ページ・指定座標に押す
  * x, y はページ左上を原点とする pt 単位
  * size は印鑑の幅 (高さは縦横比維持)

@@ -18,6 +18,7 @@ import {
   addText,
   mergePdfs,
   splitPdf,
+  imagesToPdf,
 } from './services/pdfService';
 
 function App(): React.JSX.Element {
@@ -175,6 +176,22 @@ function App(): React.JSX.Element {
     } catch (err) {
       console.error(err);
       toast.error('押印に失敗しました');
+    }
+  };
+
+  const handleImagesToPdf = async (): Promise<void> => {
+    try {
+      const picked = await window.laipdf.file.pickImages();
+      if (picked.canceled || !picked.files || picked.files.length === 0) return;
+      const pdfData = await imagesToPdf(picked.files);
+      setPdfBytes(pdfData);
+      setFileName(`画像から作成_${picked.files.length}枚.pdf`);
+      setCurrentPage(1);
+      setIsDirty(true);
+      toast.success(`${picked.files.length} 枚の画像から PDF を作成しました`);
+    } catch (err) {
+      console.error(err);
+      toast.error('PDF 作成に失敗しました');
     }
   };
 
@@ -375,7 +392,7 @@ function App(): React.JSX.Element {
               </div>
             </div>
           ) : (
-            <DropZone onFile={handleFile} />
+            <DropZone onFile={handleFile} onImagesToPdf={handleImagesToPdf} />
           )}
         </main>
 

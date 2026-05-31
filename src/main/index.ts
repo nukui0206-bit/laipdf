@@ -291,6 +291,33 @@ app.whenReady().then(() => {
   )
 
   ipcMain.handle(
+    'file:pick-images',
+    async (): Promise<{
+      canceled: boolean
+      files?: Array<{ name: string; type: 'png' | 'jpg'; bytes: Uint8Array }>
+    }> => {
+      const result = await dialog.showOpenDialog({
+        title: '画像を選択（複数選択可、選択順に PDF 化）',
+        properties: ['openFile', 'multiSelections'],
+        filters: [{ name: '画像', extensions: ['png', 'jpg', 'jpeg'] }]
+      })
+      if (result.canceled || result.filePaths.length === 0) return { canceled: true }
+      const files = await Promise.all(
+        result.filePaths.map(async (p) => {
+          const ext = p.toLowerCase().split('.').pop()
+          const type: 'png' | 'jpg' = ext === 'png' ? 'png' : 'jpg'
+          return {
+            name: p.split(/[\\/]/).pop() ?? 'image',
+            type,
+            bytes: new Uint8Array(await readFile(p))
+          }
+        })
+      )
+      return { canceled: false, files }
+    }
+  )
+
+  ipcMain.handle(
     'file:open-pdfs',
     async (): Promise<{
       canceled: boolean

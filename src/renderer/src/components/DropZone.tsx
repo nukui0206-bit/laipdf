@@ -2,9 +2,10 @@ import { useCallback, useState } from 'react';
 
 interface DropZoneProps {
   onFile: (file: File) => void;
+  onImagesToPdf: () => void;
 }
 
-export function DropZone({ onFile }: DropZoneProps): React.JSX.Element {
+export function DropZone({ onFile, onImagesToPdf }: DropZoneProps): React.JSX.Element {
   const [isDragging, setIsDragging] = useState(false);
 
   const handleDrop = useCallback(
@@ -62,6 +63,17 @@ export function DropZone({ onFile }: DropZoneProps): React.JSX.Element {
         <p className="mt-6 text-xs text-gray-400">
           ローカル処理のみ。ファイルはネットに送信されません。
         </p>
+
+        <div className="mt-6 pt-6 border-t border-gray-200 w-full max-w-xs">
+          <p className="text-xs text-center text-gray-400 mb-2">または</p>
+          <button
+            type="button"
+            onClick={onImagesToPdf}
+            className="w-full px-4 py-2 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded font-medium text-sm flex items-center justify-center gap-2"
+          >
+            📷 画像 (JPG/PNG) から PDF 作成
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -29,7 +29,11 @@ const laipdf = {
     openPdfs: (): Promise<{
       canceled: boolean
       files?: Array<{ path: string; name: string; bytes: Uint8Array }>
-    }> => ipcRenderer.invoke('file:open-pdfs')
+    }> => ipcRenderer.invoke('file:open-pdfs'),
+    pickImages: (): Promise<{
+      canceled: boolean
+      files?: Array<{ name: string; type: 'png' | 'jpg'; bytes: Uint8Array }>
+    }> => ipcRenderer.invoke('file:pick-images')
   },
   fonts: {
     getJp: (): Promise<Uint8Array | null> => ipcRenderer.invoke('fonts:get-jp')
