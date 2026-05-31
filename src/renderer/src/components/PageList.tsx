@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { useDrag, useDrop } from 'react-dnd';
 import * as pdfjsLib from 'pdfjs-dist';
+
+const DRAG_TYPE = 'pdf-thumbnail';
 
 interface PageListProps {
   pdfBytes: Uint8Array;
@@ -7,24 +10,57 @@ interface PageListProps {
   onPageSelect: (page: number) => void;
   onDeletePage: (pageIndex: number) => void;
   onRotatePage: (pageIndex: number, deg: 90 | 180 | 270) => void;
+  onReorderPages: (newOrder: number[]) => void;
+}
+
+interface DragItem {
+  pageIndex: number;
 }
 
 interface ThumbnailProps {
   pdf: pdfjsLib.PDFDocumentProxy;
   pageNum: number;
+  pageIndex: number;
   isActive: boolean;
   onClick: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
+  onDropOnto: (fromIndex: number, toIndex: number) => void;
 }
 
 function Thumbnail({
   pdf,
   pageNum,
+  pageIndex,
   isActive,
   onClick,
   onContextMenu,
+  onDropOnto,
 }: ThumbnailProps): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const [{ isDragging }, dragRef] = useDrag<DragItem, void, { isDragging: boolean }>({
+    type: DRAG_TYPE,
+    item: { pageIndex },
+    collect: (monitor) => ({ isDragging: monitor.isDragging() }),
+  });
+
+  const [{ isOver, canDrop }, dropRef] = useDrop<
+    DragItem,
+    void,
+    { isOver: boolean; canDrop: boolean }
+  >({
+    accept: DRAG_TYPE,
+    canDrop: (item) => item.pageIndex !== pageIndex,
+    drop: (item) => onDropOnto(item.pageIndex, pageIndex),
+    collect: (monitor) => ({
+      isOver: monitor.isOver(),
+      canDrop: monitor.canDrop(),
+    }),
+  });
+
+  // ref 合成
+  dragRef(dropRef(wrapperRef));
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -53,21 +89,25 @@ function Thumbnail({
     };
   }, [pdf, pageNum]);
 
+  const showDropIndicator = isOver && canDrop;
+
   return (
-    <button
-      type="button"
+    <div
+      ref={wrapperRef}
       onClick={onClick}
       onContextMenu={onContextMenu}
       className={`
-        group relative w-full p-2 rounded-md transition-all
+        group relative w-full p-2 rounded-md transition-all cursor-grab active:cursor-grabbing
         ${isActive
           ? 'bg-brand-50 ring-2 ring-brand-500'
           : 'bg-white hover:bg-gray-100 ring-1 ring-gray-200'}
+        ${isDragging ? 'opacity-30' : ''}
+        ${showDropIndicator ? 'ring-2 ring-orange-500 bg-orange-50' : ''}
       `}
     >
       <canvas
         ref={canvasRef}
-        className="w-full bg-white shadow-sm"
+        className="w-full bg-white shadow-sm pointer-events-none"
         style={{ display: 'block' }}
       />
       <div
@@ -78,7 +118,7 @@ function Thumbnail({
       >
         {pageNum}
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -94,9 +134,10 @@ export function PageList({
   onPageSelect,
   onDeletePage,
   onRotatePage,
+  onReorderPages,
 }: PageListProps): React.JSX.Element {
   const [pdf, setPdf] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
-  const [pages, setPages] = useState<number[]>([]);
+  const [pageCount, setPageCount] = useState(0);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
 
   useEffect(() => {
@@ -107,7 +148,7 @@ export function PageList({
         const doc = await pdfjsLib.getDocument({ data: buffer }).promise;
         if (cancelled) return;
         setPdf(doc);
-        setPages(Array.from({ length: doc.numPages }, (_, i) => i + 1));
+        setPageCount(doc.numPages);
       } catch (err) {
         console.error('[PageList] load error', err);
       }
@@ -117,13 +158,20 @@ export function PageList({
     };
   }, [pdfBytes]);
 
-  // 外側クリックでメニュー閉じる
   useEffect(() => {
     if (!menu) return;
     const close = (): void => setMenu(null);
     window.addEventListener('click', close);
     return () => window.removeEventListener('click', close);
   }, [menu]);
+
+  const handleDropOnto = (fromIndex: number, toIndex: number): void => {
+    if (fromIndex === toIndex) return;
+    const order = Array.from({ length: pageCount }, (_, i) => i);
+    const [moved] = order.splice(fromIndex, 1);
+    order.splice(toIndex, 0, moved);
+    onReorderPages(order);
+  };
 
   if (!pdf) {
     return (
@@ -137,27 +185,31 @@ export function PageList({
     <>
       <aside className="w-48 border-r border-gray-200 bg-gray-50 overflow-y-auto">
         <div className="p-2 border-b border-gray-200 text-xs font-bold text-gray-600 sticky top-0 bg-gray-50 z-10">
-          ページ ({pages.length})
-          <div className="text-gray-400 font-normal mt-0.5">右クリックで操作</div>
+          ページ ({pageCount})
+          <div className="text-gray-400 font-normal mt-0.5">ドラッグで並び替え / 右クリックで操作</div>
         </div>
         <div className="p-2 space-y-2">
-          {pages.map((pageNum) => (
-            <Thumbnail
-              key={pageNum}
-              pdf={pdf}
-              pageNum={pageNum}
-              isActive={pageNum === currentPage}
-              onClick={() => onPageSelect(pageNum)}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                setMenu({ x: e.clientX, y: e.clientY, pageIndex: pageNum - 1 });
-              }}
-            />
-          ))}
+          {Array.from({ length: pageCount }, (_, i) => i).map((pageIndex) => {
+            const pageNum = pageIndex + 1;
+            return (
+              <Thumbnail
+                key={pageIndex}
+                pdf={pdf}
+                pageNum={pageNum}
+                pageIndex={pageIndex}
+                isActive={pageNum === currentPage}
+                onClick={() => onPageSelect(pageNum)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setMenu({ x: e.clientX, y: e.clientY, pageIndex });
+                }}
+                onDropOnto={handleDropOnto}
+              />
+            );
+          })}
         </div>
       </aside>
 
-      {/* 右クリックメニュー */}
       {menu && (
         <div
           className="fixed z-50 bg-white shadow-xl rounded-md border border-gray-200 py-1 min-w-[160px] text-sm"

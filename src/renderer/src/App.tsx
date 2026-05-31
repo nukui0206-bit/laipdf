@@ -1,9 +1,11 @@
 import { useCallback, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
+import { DndProvider } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
 import { PdfViewer } from './components/PdfViewer';
 import { PageList } from './components/PageList';
 import { DropZone } from './components/DropZone';
-import { deletePage, rotatePage } from './services/pdfService';
+import { deletePage, rotatePage, reorderPages } from './services/pdfService';
 
 function App(): React.JSX.Element {
   const [pdfBytes, setPdfBytes] = useState<Uint8Array | null>(null);
@@ -52,6 +54,19 @@ function App(): React.JSX.Element {
     }
   };
 
+  const handleReorderPages = async (newOrder: number[]): Promise<void> => {
+    if (!pdfBytes) return;
+    try {
+      const updated = await reorderPages(pdfBytes, newOrder);
+      setPdfBytes(updated);
+      setIsDirty(true);
+      toast.success('ページを並び替えました');
+    } catch (err) {
+      console.error(err);
+      toast.error('並び替えに失敗しました');
+    }
+  };
+
   const handleRotatePage = async (
     pageIndex: number,
     deg: 90 | 180 | 270,
@@ -84,8 +99,16 @@ function App(): React.JSX.Element {
   };
 
   return (
+    <DndProvider backend={HTML5Backend}>
     <div className="flex flex-col h-full">
-      <Toaster position="bottom-right" />
+      <Toaster
+        position="top-right"
+        containerStyle={{ zIndex: 9999, top: 60 }}
+        toastOptions={{
+          duration: 2000,
+          style: { fontSize: '13px', padding: '8px 14px' },
+        }}
+      />
 
       {/* ヘッダー */}
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm">
@@ -128,6 +151,7 @@ function App(): React.JSX.Element {
               onPageSelect={setCurrentPage}
               onDeletePage={handleDeletePage}
               onRotatePage={handleRotatePage}
+              onReorderPages={handleReorderPages}
             />
             <div className="flex-1 overflow-hidden">
               <PdfViewer
@@ -153,6 +177,7 @@ function App(): React.JSX.Element {
         <span>© Laiweb / L&apos;aide</span>
       </footer>
     </div>
+    </DndProvider>
   );
 }
 

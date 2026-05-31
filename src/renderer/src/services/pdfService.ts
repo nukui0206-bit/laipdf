@@ -25,6 +25,21 @@ export async function rotatePage(
 }
 
 /**
+ * ページ並び替え (newOrder は元 PDF の 0 始まり index 配列。並べたい順序で渡す)
+ * 例: 元が [A, B, C] で newOrder=[2, 0, 1] なら [C, A, B] になる
+ */
+export async function reorderPages(
+  bytes: Uint8Array,
+  newOrder: number[],
+): Promise<Uint8Array> {
+  const src = await PDFDocument.load(bytes);
+  const newDoc = await PDFDocument.create();
+  const pages = await newDoc.copyPages(src, newOrder);
+  pages.forEach((p) => newDoc.addPage(p));
+  return await newDoc.save();
+}
+
+/**
  * 複数 PDF を結合
  */
 export async function mergePdfs(buffers: Uint8Array[]): Promise<Uint8Array> {
