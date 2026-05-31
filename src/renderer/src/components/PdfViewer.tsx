@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
+// Vite で worker を URL として import (PDF.js v6 標準)
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
-// pdfjs worker 設定 (Vite ESM)
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url,
-).toString();
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 interface PdfViewerProps {
   pdfBytes: Uint8Array;
@@ -22,12 +20,17 @@ export function PdfViewer({ pdfBytes }: PdfViewerProps): React.JSX.Element {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const loadingTask = pdfjsLib.getDocument({ data: pdfBytes });
-      const doc = await loadingTask.promise;
-      if (cancelled) return;
-      setPdf(doc);
-      setTotalPages(doc.numPages);
-      setPageNum(1);
+      try {
+        const buffer = pdfBytes.slice().buffer;
+        const loadingTask = pdfjsLib.getDocument({ data: buffer });
+        const doc = await loadingTask.promise;
+        if (cancelled) return;
+        setPdf(doc);
+        setTotalPages(doc.numPages);
+        setPageNum(1);
+      } catch (err) {
+        console.error('[PdfViewer] load error', err);
+      }
     })();
     return () => {
       cancelled = true;
@@ -38,17 +41,26 @@ export function PdfViewer({ pdfBytes }: PdfViewerProps): React.JSX.Element {
   useEffect(() => {
     if (!pdf || !canvasRef.current) return;
     let renderTask: pdfjsLib.RenderTask | null = null;
+    let cancelled = false;
     (async () => {
-      const page = await pdf.getPage(pageNum);
-      const viewport = page.getViewport({ scale });
-      const canvas = canvasRef.current!;
-      const ctx = canvas.getContext('2d')!;
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      renderTask = page.render({ canvas, canvasContext: ctx, viewport });
-      await renderTask.promise;
+      try {
+        const page = await pdf.getPage(pageNum);
+        if (cancelled) return;
+        const viewport = page.getViewport({ scale });
+        const canvas = canvasRef.current!;
+        const ctx = canvas.getContext('2d')!;
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        renderTask = page.render({ canvasContext: ctx, viewport });
+        await renderTask.promise;
+      } catch (err) {
+        if ((err as { name?: string })?.name !== 'RenderingCancelledException') {
+          console.error('[PdfViewer] render error', err);
+        }
+      }
     })();
     return () => {
+      cancelled = true;
       renderTask?.cancel();
     };
   }, [pdf, pageNum, scale]);
