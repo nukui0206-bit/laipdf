@@ -5,7 +5,9 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import { PdfViewer } from './components/PdfViewer';
 import { PageList } from './components/PageList';
 import { DropZone } from './components/DropZone';
-import { deletePage, rotatePage, reorderPages } from './services/pdfService';
+import { StampManager } from './components/StampManager';
+import type { StampMeta } from '../../preload';
+import { deletePage, rotatePage, reorderPages, stampOnPage } from './services/pdfService';
 
 function App(): React.JSX.Element {
   const [pdfBytes, setPdfBytes] = useState<Uint8Array | null>(null);
@@ -13,6 +15,8 @@ function App(): React.JSX.Element {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [isDirty, setIsDirty] = useState(false);
+  const [stampModalOpen, setStampModalOpen] = useState(false);
+  const [stampMode, setStampMode] = useState<StampMeta | null>(null);
 
   const handleFile = async (file: File): Promise<void> => {
     const buffer = await file.arrayBuffer();
@@ -29,6 +33,7 @@ function App(): React.JSX.Element {
     setCurrentPage(1);
     setTotalPages(0);
     setIsDirty(false);
+    setStampMode(null);
   };
 
   const handleTotalPagesChange = useCallback((n: number) => setTotalPages(n), []);
@@ -43,7 +48,6 @@ function App(): React.JSX.Element {
       const updated = await deletePage(pdfBytes, pageIndex);
       setPdfBytes(updated);
       setIsDirty(true);
-      // 削除後に currentPage が範囲外になる可能性
       if (currentPage > totalPages - 1) {
         setCurrentPage(Math.max(1, totalPages - 1));
       }
@@ -83,6 +87,30 @@ function App(): React.JSX.Element {
     }
   };
 
+  const handleStampPlaced = async (
+    pageIndex: number,
+    xPt: number,
+    yPt: number,
+    sizePt: number,
+  ): Promise<void> => {
+    if (!pdfBytes || !stampMode) return;
+    try {
+      // dataURL → bytes
+      const base64 = stampMode.dataUrl.split(',')[1];
+      const bin = atob(base64);
+      const stampBytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) stampBytes[i] = bin.charCodeAt(i);
+
+      const updated = await stampOnPage(pdfBytes, pageIndex, stampBytes, xPt, yPt, sizePt);
+      setPdfBytes(updated);
+      setIsDirty(true);
+      toast.success(`「${stampMode.name}」を押印しました`);
+    } catch (err) {
+      console.error(err);
+      toast.error('押印に失敗しました');
+    }
+  };
+
   const handleSave = async (): Promise<void> => {
     if (!pdfBytes) return;
     try {
@@ -100,83 +128,116 @@ function App(): React.JSX.Element {
 
   return (
     <DndProvider backend={HTML5Backend}>
-    <div className="flex flex-col h-full">
-      <Toaster
-        position="top-right"
-        containerStyle={{ zIndex: 9999, top: 60 }}
-        toastOptions={{
-          duration: 2000,
-          style: { fontSize: '13px', padding: '8px 14px' },
-        }}
-      />
+      <div className="flex flex-col h-full">
+        <Toaster
+          position="top-right"
+          containerStyle={{ zIndex: 9999, top: 60 }}
+          toastOptions={{
+            duration: 2000,
+            style: { fontSize: '13px', padding: '8px 14px' },
+          }}
+        />
 
-      {/* ヘッダー */}
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">📄</span>
-          <h1 className="text-lg font-bold text-gray-800">LaiPDF</h1>
-          <span className="text-xs text-gray-400">v0.1.0 (dev)</span>
-        </div>
-        {pdfBytes && (
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-600 truncate max-w-md">
-              {fileName}
-              {isDirty && <span className="ml-1 text-orange-500">●</span>}
-            </span>
-            <button
-              type="button"
-              onClick={handleSave}
-              className="px-4 py-1.5 text-sm bg-brand-600 hover:bg-brand-700 text-white rounded font-medium"
-            >
-              💾 保存
-            </button>
-            <button
-              type="button"
-              onClick={handleClose}
-              className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded text-gray-700"
-            >
-              閉じる
-            </button>
+        <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">📄</span>
+            <h1 className="text-lg font-bold text-gray-800">LaiPDF</h1>
+            <span className="text-xs text-gray-400">v0.1.0 (dev)</span>
           </div>
-        )}
-      </header>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setStampModalOpen(true)}
+              className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded font-medium"
+              title="印鑑を登録・管理"
+            >
+              🖼 印鑑管理
+            </button>
+            {pdfBytes && (
+              <>
+                {stampMode ? (
+                  <button
+                    type="button"
+                    onClick={() => setStampMode(null)}
+                    className="px-3 py-1.5 text-sm bg-orange-100 hover:bg-orange-200 text-orange-700 rounded font-medium"
+                  >
+                    ✕ 押印モード解除
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setStampModalOpen(true)}
+                    className="px-3 py-1.5 text-sm bg-orange-50 hover:bg-orange-100 text-orange-700 rounded font-medium"
+                  >
+                    🖌 押印する
+                  </button>
+                )}
+                <span className="text-sm text-gray-600 truncate max-w-xs ml-2">
+                  {fileName}
+                  {isDirty && <span className="ml-1 text-orange-500">●</span>}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  className="px-4 py-1.5 text-sm bg-brand-600 hover:bg-brand-700 text-white rounded font-medium"
+                >
+                  💾 保存
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded text-gray-700"
+                >
+                  閉じる
+                </button>
+              </>
+            )}
+          </div>
+        </header>
 
-      {/* メインエリア */}
-      <main className="flex-1 overflow-hidden bg-gray-100">
-        {pdfBytes ? (
-          <div className="flex h-full">
-            <PageList
-              pdfBytes={pdfBytes}
-              currentPage={currentPage}
-              onPageSelect={setCurrentPage}
-              onDeletePage={handleDeletePage}
-              onRotatePage={handleRotatePage}
-              onReorderPages={handleReorderPages}
-            />
-            <div className="flex-1 overflow-hidden">
-              <PdfViewer
+        <main className="flex-1 overflow-hidden bg-gray-100">
+          {pdfBytes ? (
+            <div className="flex h-full">
+              <PageList
                 pdfBytes={pdfBytes}
-                pageNum={currentPage}
-                onPageChange={setCurrentPage}
-                onTotalPagesChange={handleTotalPagesChange}
+                currentPage={currentPage}
+                onPageSelect={setCurrentPage}
+                onDeletePage={handleDeletePage}
+                onRotatePage={handleRotatePage}
+                onReorderPages={handleReorderPages}
               />
+              <div className="flex-1 overflow-hidden">
+                <PdfViewer
+                  pdfBytes={pdfBytes}
+                  pageNum={currentPage}
+                  onPageChange={setCurrentPage}
+                  onTotalPagesChange={handleTotalPagesChange}
+                  stampMode={stampMode}
+                  onStampPlaced={handleStampPlaced}
+                />
+              </div>
             </div>
-          </div>
-        ) : (
-          <DropZone onFile={handleFile} />
-        )}
-      </main>
+          ) : (
+            <DropZone onFile={handleFile} />
+          )}
+        </main>
 
-      {/* フッター */}
-      <footer className="bg-white border-t border-gray-200 px-4 py-2 text-xs text-gray-500 flex justify-between">
-        <span>
-          {pdfBytes
-            ? `${(pdfBytes.byteLength / 1024).toFixed(1)} KB ・ ${totalPages} ページ${isDirty ? ' ・ 未保存' : ''}`
-            : 'ファイル未選択'}
-        </span>
-        <span>© Laiweb / L&apos;aide</span>
-      </footer>
-    </div>
+        <footer className="bg-white border-t border-gray-200 px-4 py-2 text-xs text-gray-500 flex justify-between">
+          <span>
+            {pdfBytes
+              ? `${(pdfBytes.byteLength / 1024).toFixed(1)} KB ・ ${totalPages} ページ${isDirty ? ' ・ 未保存' : ''}`
+              : 'ファイル未選択'}
+          </span>
+          <span>© Laiweb / L&apos;aide</span>
+        </footer>
+
+        <StampManager
+          open={stampModalOpen}
+          onClose={() => setStampModalOpen(false)}
+          onSelect={(s) => setStampMode(s)}
+          selectedId={stampMode?.id ?? null}
+        />
+      </div>
     </DndProvider>
   );
 }

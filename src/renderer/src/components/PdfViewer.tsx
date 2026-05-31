@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
-// Vite で worker を URL として import (PDF.js v6 標準)
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import type { StampMeta } from '../../../preload';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -10,6 +10,8 @@ interface PdfViewerProps {
   pageNum: number;
   onPageChange: (page: number) => void;
   onTotalPagesChange: (n: number) => void;
+  stampMode: StampMeta | null;
+  onStampPlaced: (pageIndex: number, xPt: number, yPt: number, sizePt: number) => void;
 }
 
 export function PdfViewer({
@@ -17,13 +19,15 @@ export function PdfViewer({
   pageNum,
   onPageChange,
   onTotalPagesChange,
+  stampMode,
+  onStampPlaced,
 }: PdfViewerProps): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1.2);
   const [pdf, setPdf] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
+  const [pagePtSize, setPagePtSize] = useState<{ w: number; h: number } | null>(null);
 
-  // PDF ロード
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -44,7 +48,6 @@ export function PdfViewer({
     };
   }, [pdfBytes, onTotalPagesChange]);
 
-  // ページレンダリング
   useEffect(() => {
     if (!pdf || !canvasRef.current) return;
     let renderTask: pdfjsLib.RenderTask | null = null;
@@ -53,6 +56,8 @@ export function PdfViewer({
       try {
         const page = await pdf.getPage(pageNum);
         if (cancelled) return;
+        const ptViewport = page.getViewport({ scale: 1 });
+        setPagePtSize({ w: ptViewport.width, h: ptViewport.height });
         const viewport = page.getViewport({ scale });
         const canvas = canvasRef.current!;
         const ctx = canvas.getContext('2d')!;
@@ -72,9 +77,21 @@ export function PdfViewer({
     };
   }, [pdf, pageNum, scale]);
 
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>): void => {
+    if (!stampMode || !pagePtSize || !canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    // Canvas 内の座標 (CSS px)
+    const cssX = e.clientX - rect.left;
+    const cssY = e.clientY - rect.top;
+    // CSS px → PDF pt (scale で割る)
+    const xPt = cssX / scale;
+    const yPt = cssY / scale;
+    const sizePt = 70; // 約 25mm 角
+    onStampPlaced(pageNum - 1, xPt - sizePt / 2, yPt - sizePt / 2, sizePt);
+  };
+
   return (
     <div className="h-full flex flex-col">
-      {/* ツールバー */}
       <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center gap-2 shadow-sm">
         <button
           type="button"
@@ -95,6 +112,16 @@ export function PdfViewer({
         >
           次 →
         </button>
+
+        {stampMode && (
+          <div className="ml-4 flex items-center gap-2 px-3 py-1 bg-orange-50 border border-orange-300 rounded">
+            <img src={stampMode.dataUrl} alt="" className="w-6 h-6 object-contain" />
+            <span className="text-xs text-orange-700">
+              押印モード「{stampMode.name}」— PDF クリックで押印
+            </span>
+          </div>
+        )}
+
         <div className="ml-auto flex items-center gap-1">
           <button
             type="button"
@@ -114,9 +141,12 @@ export function PdfViewer({
         </div>
       </div>
 
-      {/* キャンバスエリア */}
       <div className="flex-1 overflow-auto p-6 flex items-start justify-center">
-        <canvas ref={canvasRef} className="shadow-xl bg-white" />
+        <canvas
+          ref={canvasRef}
+          onClick={handleCanvasClick}
+          className={`shadow-xl bg-white ${stampMode ? 'cursor-crosshair' : ''}`}
+        />
       </div>
     </div>
   );

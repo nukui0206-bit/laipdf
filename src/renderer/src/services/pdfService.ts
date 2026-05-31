@@ -1,6 +1,33 @@
 import { PDFDocument, degrees } from 'pdf-lib';
 
 /**
+ * 印鑑画像を PDF の指定ページ・指定座標に押す
+ * x, y はページ左上を原点とする pt 単位
+ * size は印鑑の幅 (高さは縦横比維持)
+ */
+export async function stampOnPage(
+  bytes: Uint8Array,
+  pageIndex: number,
+  stampPngBytes: Uint8Array,
+  xFromLeft: number,
+  yFromTop: number,
+  size: number,
+): Promise<Uint8Array> {
+  const pdf = await PDFDocument.load(bytes);
+  const png = await pdf.embedPng(stampPngBytes);
+  const page = pdf.getPage(pageIndex);
+  const { width: pageW, height: pageH } = page.getSize();
+  const aspectRatio = png.height / png.width;
+  const w = Math.min(size, pageW);
+  const h = w * aspectRatio;
+  // pdf-lib は左下原点なので Y 軸変換
+  const x = Math.max(0, Math.min(xFromLeft, pageW - w));
+  const y = Math.max(0, Math.min(pageH - yFromTop - h, pageH - h));
+  page.drawImage(png, { x, y, width: w, height: h });
+  return await pdf.save();
+}
+
+/**
  * ページ削除 (pageIndex は 0 始まり)
  */
 export async function deletePage(bytes: Uint8Array, pageIndex: number): Promise<Uint8Array> {

@@ -1,6 +1,14 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
+interface StampMeta {
+  id: string
+  name: string
+  fileName: string
+  createdAt: number
+  dataUrl: string
+}
+
 const laipdf = {
   file: {
     savePdf: (
@@ -10,6 +18,14 @@ const laipdf = {
       ipcRenderer.invoke('file:save-pdf', bytes, suggestedName),
     openPdf: (): Promise<{ canceled: boolean; path?: string; bytes?: Uint8Array }> =>
       ipcRenderer.invoke('file:open-pdf')
+  },
+  stamps: {
+    list: (): Promise<StampMeta[]> => ipcRenderer.invoke('stamps:list'),
+    pickImage: (): Promise<{ canceled: boolean; bytes?: Uint8Array; name?: string }> =>
+      ipcRenderer.invoke('stamps:pick-image'),
+    add: (bytes: Uint8Array, name: string): Promise<StampMeta> =>
+      ipcRenderer.invoke('stamps:add', bytes, name),
+    delete: (id: string): Promise<boolean> => ipcRenderer.invoke('stamps:delete', id)
   }
 }
 
@@ -28,3 +44,4 @@ if (process.contextIsolated) {
 }
 
 export type LaiPdfAPI = typeof laipdf
+export type { StampMeta }
