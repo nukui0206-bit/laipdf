@@ -1,21 +1,29 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { PdfViewer } from './components/PdfViewer';
+import { PageList } from './components/PageList';
 import { DropZone } from './components/DropZone';
 
 function App(): React.JSX.Element {
   const [pdfBytes, setPdfBytes] = useState<Uint8Array | null>(null);
   const [fileName, setFileName] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
 
   const handleFile = async (file: File): Promise<void> => {
     const buffer = await file.arrayBuffer();
     setPdfBytes(new Uint8Array(buffer));
     setFileName(file.name);
+    setCurrentPage(1);
   };
 
   const handleClose = (): void => {
     setPdfBytes(null);
     setFileName('');
+    setCurrentPage(1);
+    setTotalPages(0);
   };
+
+  const handleTotalPagesChange = useCallback((n: number) => setTotalPages(n), []);
 
   return (
     <div className="flex flex-col h-full">
@@ -43,7 +51,21 @@ function App(): React.JSX.Element {
       {/* メインエリア */}
       <main className="flex-1 overflow-hidden bg-gray-100">
         {pdfBytes ? (
-          <PdfViewer pdfBytes={pdfBytes} />
+          <div className="flex h-full">
+            <PageList
+              pdfBytes={pdfBytes}
+              currentPage={currentPage}
+              onPageSelect={setCurrentPage}
+            />
+            <div className="flex-1 overflow-hidden">
+              <PdfViewer
+                pdfBytes={pdfBytes}
+                pageNum={currentPage}
+                onPageChange={setCurrentPage}
+                onTotalPagesChange={handleTotalPagesChange}
+              />
+            </div>
+          </div>
         ) : (
           <DropZone onFile={handleFile} />
         )}
@@ -51,7 +73,11 @@ function App(): React.JSX.Element {
 
       {/* フッター */}
       <footer className="bg-white border-t border-gray-200 px-4 py-2 text-xs text-gray-500 flex justify-between">
-        <span>{pdfBytes ? `${(pdfBytes.byteLength / 1024).toFixed(1)} KB` : 'ファイル未選択'}</span>
+        <span>
+          {pdfBytes
+            ? `${(pdfBytes.byteLength / 1024).toFixed(1)} KB ・ ${totalPages} ページ`
+            : 'ファイル未選択'}
+        </span>
         <span>© Laiweb / L&apos;aide</span>
       </footer>
     </div>

@@ -7,11 +7,18 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 interface PdfViewerProps {
   pdfBytes: Uint8Array;
+  pageNum: number;
+  onPageChange: (page: number) => void;
+  onTotalPagesChange: (n: number) => void;
 }
 
-export function PdfViewer({ pdfBytes }: PdfViewerProps): React.JSX.Element {
+export function PdfViewer({
+  pdfBytes,
+  pageNum,
+  onPageChange,
+  onTotalPagesChange,
+}: PdfViewerProps): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [pageNum, setPageNum] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1.2);
   const [pdf, setPdf] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
@@ -27,7 +34,7 @@ export function PdfViewer({ pdfBytes }: PdfViewerProps): React.JSX.Element {
         if (cancelled) return;
         setPdf(doc);
         setTotalPages(doc.numPages);
-        setPageNum(1);
+        onTotalPagesChange(doc.numPages);
       } catch (err) {
         console.error('[PdfViewer] load error', err);
       }
@@ -35,7 +42,7 @@ export function PdfViewer({ pdfBytes }: PdfViewerProps): React.JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [pdfBytes]);
+  }, [pdfBytes, onTotalPagesChange]);
 
   // ページレンダリング
   useEffect(() => {
@@ -72,7 +79,7 @@ export function PdfViewer({ pdfBytes }: PdfViewerProps): React.JSX.Element {
         <button
           type="button"
           disabled={pageNum <= 1}
-          onClick={() => setPageNum((p) => Math.max(1, p - 1))}
+          onClick={() => onPageChange(Math.max(1, pageNum - 1))}
           className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-40 rounded"
         >
           ← 前
@@ -83,7 +90,7 @@ export function PdfViewer({ pdfBytes }: PdfViewerProps): React.JSX.Element {
         <button
           type="button"
           disabled={pageNum >= totalPages}
-          onClick={() => setPageNum((p) => Math.min(totalPages, p + 1))}
+          onClick={() => onPageChange(Math.min(totalPages, pageNum + 1))}
           className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-40 rounded"
         >
           次 →
