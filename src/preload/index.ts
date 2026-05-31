@@ -9,6 +9,14 @@ interface StampMeta {
   dataUrl: string
 }
 
+interface LicenseInfo {
+  email: string
+  key: string
+  activatedAt: number
+  expiresAt: number | null
+  isTrialMode: boolean
+}
+
 const laipdf = {
   file: {
     savePdf: (
@@ -25,6 +33,18 @@ const laipdf = {
   },
   fonts: {
     getJp: (): Promise<Uint8Array | null> => ipcRenderer.invoke('fonts:get-jp')
+  },
+  license: {
+    status: (): Promise<{ activated: boolean; license: LicenseInfo | null }> =>
+      ipcRenderer.invoke('license:status'),
+    verify: (
+      email: string,
+      key: string
+    ): Promise<{ ok: boolean; message: string; license?: LicenseInfo }> =>
+      ipcRenderer.invoke('license:verify', email, key),
+    startTrial: (): Promise<{ ok: boolean; license: LicenseInfo }> =>
+      ipcRenderer.invoke('license:start-trial'),
+    deactivate: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('license:deactivate')
   },
   stamps: {
     list: (): Promise<StampMeta[]> => ipcRenderer.invoke('stamps:list'),
@@ -51,4 +71,4 @@ if (process.contextIsolated) {
 }
 
 export type LaiPdfAPI = typeof laipdf
-export type { StampMeta }
+export type { StampMeta, LicenseInfo }

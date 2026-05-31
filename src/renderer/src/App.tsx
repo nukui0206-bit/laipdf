@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -8,7 +8,8 @@ import { DropZone } from './components/DropZone';
 import { StampManager } from './components/StampManager';
 import { TextInputDialog } from './components/TextInputDialog';
 import { SplitDialog } from './components/SplitDialog';
-import type { StampMeta } from '../../preload';
+import { LicenseScreen } from './components/LicenseScreen';
+import type { StampMeta, LicenseInfo } from '../../preload';
 import {
   deletePage,
   rotatePage,
@@ -34,6 +35,24 @@ function App(): React.JSX.Element {
     yPt: number;
   } | null>(null);
   const [splitDialogOpen, setSplitDialogOpen] = useState(false);
+  const [license, setLicense] = useState<LicenseInfo | null>(null);
+  const [licenseChecked, setLicenseChecked] = useState(false);
+
+  // 起動時にライセンス状態を取得
+  useEffect(() => {
+    (async () => {
+      try {
+        const status = await window.laipdf.license.status();
+        if (status.activated && status.license) {
+          setLicense(status.license);
+        }
+      } catch (err) {
+        console.error('license check failed', err);
+      } finally {
+        setLicenseChecked(true);
+      }
+    })();
+  }, []);
 
   const handleFile = async (file: File): Promise<void> => {
     const buffer = await file.arrayBuffer();
@@ -211,6 +230,18 @@ function App(): React.JSX.Element {
     }
   };
 
+  // ライセンス未認証 → ライセンス画面のみ
+  if (!licenseChecked) {
+    return (
+      <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+        起動中...
+      </div>
+    );
+  }
+  if (!license) {
+    return <LicenseScreen onActivated={setLicense} />;
+  }
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col h-full">
@@ -354,7 +385,12 @@ function App(): React.JSX.Element {
               ? `${(pdfBytes.byteLength / 1024).toFixed(1)} KB ・ ${totalPages} ページ${isDirty ? ' ・ 未保存' : ''}`
               : 'ファイル未選択'}
           </span>
-          <span>© Laiweb / L&apos;aide</span>
+          <span>
+            {license.isTrialMode
+              ? `🆓 体験版 (${Math.max(0, Math.ceil(((license.expiresAt ?? 0) - Date.now()) / (24 * 60 * 60 * 1000)))} 日残り)`
+              : `✅ ${license.email || 'ライセンス済み'}`}
+            ・ © Laiweb / L&apos;aide
+          </span>
         </footer>
 
         <StampManager

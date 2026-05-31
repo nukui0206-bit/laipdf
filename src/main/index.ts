@@ -3,8 +3,22 @@ import { join } from 'path'
 import { writeFile, readFile, readdir, mkdir, unlink } from 'fs/promises'
 import { existsSync } from 'fs'
 import { randomUUID } from 'crypto'
+import Store from 'electron-store'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+
+interface LicenseInfo {
+  email: string
+  key: string
+  activatedAt: number
+  expiresAt: number | null
+  isTrialMode: boolean
+}
+
+const licenseStore = new Store<{ license?: LicenseInfo }>({
+  name: 'license',
+  defaults: {}
+})
 
 const STAMPS_DIR = join(app.getPath('userData'), 'stamps')
 const FONTS_DIR = join(app.getPath('userData'), 'fonts')
@@ -89,6 +103,73 @@ app.whenReady().then(() => {
       return { saved: true, path: result.filePath }
     }
   )
+
+  // ===== License IPC =====
+  ipcMain.handle(
+    'license:status',
+    (): { activated: boolean; license: LicenseInfo | null } => {
+      const lic = licenseStore.get('license') ?? null
+      if (!lic) return { activated: false, license: null }
+      // 有効期限チェック
+      if (lic.expiresAt && Date.now() > lic.expiresAt) {
+        return { activated: false, license: lic }
+      }
+      return { activated: true, license: lic }
+    }
+  )
+
+  ipcMain.handle(
+    'license:verify',
+    async (
+      _event,
+      email: string,
+      key: string
+    ): Promise<{ ok: boolean; message: string; license?: LicenseInfo }> => {
+      // モック実装: 後で hub.salestree.online API に差し替え
+      // 有効パターン:
+      //   - メアドに @laiweb.jp / @laide / @salestree が含まれる
+      //   - キーが "LAIPDF-" で始まる任意の文字列
+      //   - またはマスター: "MASTER-DEBUG-KEY"
+      const e = email.trim().toLowerCase()
+      const k = key.trim().toUpperCase()
+      const validEmail =
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) &&
+        (e.includes('@laiweb') || e.includes('@laide') || e.includes('@salestree') ||
+          k === 'MASTER-DEBUG-KEY' || k.startsWith('LAIPDF-'))
+      if (!validEmail) {
+        return {
+          ok: false,
+          message: 'メアドまたはライセンスキーが無効です。Laiweb 契約者向けキーをご確認ください。'
+        }
+      }
+      const lic: LicenseInfo = {
+        email: e,
+        key: k,
+        activatedAt: Date.now(),
+        expiresAt: null, // 永久
+        isTrialMode: false
+      }
+      licenseStore.set('license', lic)
+      return { ok: true, message: '認証成功', license: lic }
+    }
+  )
+
+  ipcMain.handle('license:start-trial', (): { ok: boolean; license: LicenseInfo } => {
+    const lic: LicenseInfo = {
+      email: '',
+      key: 'TRIAL',
+      activatedAt: Date.now(),
+      expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 日後
+      isTrialMode: true
+    }
+    licenseStore.set('license', lic)
+    return { ok: true, license: lic }
+  })
+
+  ipcMain.handle('license:deactivate', (): { ok: boolean } => {
+    licenseStore.delete('license')
+    return { ok: true }
+  })
 
   // ===== Fonts IPC =====
   ipcMain.handle('fonts:get-jp', async (): Promise<Uint8Array | null> => {
