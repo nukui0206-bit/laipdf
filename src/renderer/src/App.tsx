@@ -33,6 +33,47 @@ function App(): React.JSX.Element {
   const [stampMode, setStampMode] = useState<StampMeta | null>(null);
   const [textMode, setTextMode] = useState(false);
   const [shapeMode, setShapeMode] = useState<ShapeKind | null>(null);
+  const [shapeColor, setShapeColor] = useState<{ r: number; g: number; b: number; label: string }>({
+    r: 0.85, g: 0.1, b: 0.1, label: '赤',
+  });
+  const [lineWidth, setLineWidth] = useState(2);
+  const [undoStack, setUndoStack] = useState<Uint8Array[]>([]);
+  const MAX_UNDO = 10;
+
+  // pdfBytes を更新する前に履歴に push (ファイル開いた時/閉じた時は履歴クリア)
+  const pushHistory = useCallback((current: Uint8Array) => {
+    setUndoStack((prev) => {
+      const next = [...prev, current];
+      if (next.length > MAX_UNDO) next.shift();
+      return next;
+    });
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    if (undoStack.length === 0) {
+      toast('取り消す操作がありません', { icon: 'ℹ' });
+      return;
+    }
+    const prev = undoStack[undoStack.length - 1];
+    setUndoStack((s) => s.slice(0, -1));
+    setPdfBytes(prev);
+    toast.success('1 操作を取り消しました');
+  }, [undoStack]);
+
+  // Ctrl+Z キーバインド
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        // input/textarea にフォーカスがある時はスキップ
+        const tag = (document.activeElement?.tagName ?? '').toLowerCase();
+        if (tag === 'input' || tag === 'textarea') return;
+        e.preventDefault();
+        handleUndo();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [handleUndo]);
   const [pendingTextSpot, setPendingTextSpot] = useState<{
     pageIndex: number;
     xPt: number;
@@ -64,6 +105,7 @@ function App(): React.JSX.Element {
     setFileName(file.name);
     setCurrentPage(1);
     setIsDirty(false);
+    setUndoStack([]);
   };
 
   const handleClose = (): void => {
@@ -74,6 +116,7 @@ function App(): React.JSX.Element {
     setTotalPages(0);
     setIsDirty(false);
     setStampMode(null);
+    setUndoStack([]);
   };
 
   const handleTotalPagesChange = useCallback((n: number) => setTotalPages(n), []);
@@ -85,6 +128,7 @@ function App(): React.JSX.Element {
       return;
     }
     try {
+      pushHistory(pdfBytes);
       const updated = await deletePage(pdfBytes, pageIndex);
       setPdfBytes(updated);
       setIsDirty(true);
@@ -101,6 +145,7 @@ function App(): React.JSX.Element {
   const handleReorderPages = async (newOrder: number[]): Promise<void> => {
     if (!pdfBytes) return;
     try {
+      pushHistory(pdfBytes);
       const updated = await reorderPages(pdfBytes, newOrder);
       setPdfBytes(updated);
       setIsDirty(true);
@@ -117,6 +162,7 @@ function App(): React.JSX.Element {
   ): Promise<void> => {
     if (!pdfBytes) return;
     try {
+      pushHistory(pdfBytes);
       const updated = await rotatePage(pdfBytes, pageIndex, deg);
       setPdfBytes(updated);
       setIsDirty(true);
@@ -138,6 +184,7 @@ function App(): React.JSX.Element {
   ): Promise<void> => {
     if (!pdfBytes || !pendingTextSpot) return;
     try {
+      pushHistory(pdfBytes);
       const updated = await addText(
         pdfBytes,
         pendingTextSpot.pageIndex,
@@ -167,6 +214,7 @@ function App(): React.JSX.Element {
     if (!pdfBytes || !stampMode) return;
     try {
       // dataURL → bytes
+      pushHistory(pdfBytes);
       const base64 = stampMode.dataUrl.split(',')[1];
       const bin = atob(base64);
       const stampBytes = new Uint8Array(bin.length);
@@ -191,7 +239,20 @@ function App(): React.JSX.Element {
   ): Promise<void> => {
     if (!pdfBytes || !shapeMode) return;
     try {
-      const updated = await drawShape(pdfBytes, pageIndex, shapeMode, x1, y1, x2, y2);
+      pushHistory(pdfBytes);
+      const updated = await drawShape(
+        pdfBytes,
+        pageIndex,
+        shapeMode,
+        x1,
+        y1,
+        x2,
+        y2,
+        shapeMode === 'highlight'
+          ? { r: 1, g: 0.95, b: 0 }
+          : { r: shapeColor.r, g: shapeColor.g, b: shapeColor.b },
+        lineWidth,
+      );
       setPdfBytes(updated);
       setIsDirty(true);
       toast.success(`図形を追加しました`);
@@ -222,6 +283,7 @@ function App(): React.JSX.Element {
     try {
       const picked = await window.laipdf.file.openPdfs();
       if (picked.canceled || !picked.files || picked.files.length === 0) return;
+      pushHistory(pdfBytes);
       const buffers = [pdfBytes, ...picked.files.map((f) => f.bytes)];
       const merged = await mergePdfs(buffers);
       setPdfBytes(merged);
@@ -310,6 +372,50 @@ function App(): React.JSX.Element {
             </button>
             {pdfBytes && (
               <>
+                {/* Undo */}
+                <button
+                  type="button"
+                  onClick={handleUndo}
+                  disabled={undoStack.length === 0}
+                  className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-40 rounded font-medium"
+                  title="Ctrl+Z で元に戻す"
+                >
+                  ↶ 元に戻す ({undoStack.length})
+                </button>
+
+                {/* 色選択 (図形 / マーカー以外) */}
+                {(shapeMode && shapeMode !== 'highlight') || textMode ? (
+                  <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded">
+                    <span className="text-xs text-gray-500">色:</span>
+                    {[
+                      { r: 0.85, g: 0.10, b: 0.10, label: '赤' },
+                      { r: 0.10, g: 0.30, b: 0.85, label: '青' },
+                      { r: 0.10, g: 0.55, b: 0.20, label: '緑' },
+                      { r: 0,    g: 0,    b: 0,    label: '黒' },
+                    ].map((c) => (
+                      <button
+                        key={c.label}
+                        type="button"
+                        onClick={() => setShapeColor(c)}
+                        className={`w-5 h-5 rounded border-2 ${shapeColor.label === c.label ? 'border-gray-800 scale-110' : 'border-gray-300'}`}
+                        style={{ backgroundColor: `rgb(${c.r * 255},${c.g * 255},${c.b * 255})` }}
+                        title={c.label}
+                      />
+                    ))}
+                    <span className="ml-2 text-xs text-gray-500">線:</span>
+                    {[1, 2, 4, 6].map((w) => (
+                      <button
+                        key={w}
+                        type="button"
+                        onClick={() => setLineWidth(w)}
+                        className={`px-2 py-0.5 text-xs rounded ${lineWidth === w ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 border border-gray-300'}`}
+                      >
+                        {w}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+
                 {textMode ? (
                   <button
                     type="button"
