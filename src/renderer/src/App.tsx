@@ -19,6 +19,8 @@ import {
   mergePdfs,
   splitPdf,
   imagesToPdf,
+  drawShape,
+  type ShapeKind,
 } from './services/pdfService';
 
 function App(): React.JSX.Element {
@@ -30,6 +32,7 @@ function App(): React.JSX.Element {
   const [stampModalOpen, setStampModalOpen] = useState(false);
   const [stampMode, setStampMode] = useState<StampMeta | null>(null);
   const [textMode, setTextMode] = useState(false);
+  const [shapeMode, setShapeMode] = useState<ShapeKind | null>(null);
   const [pendingTextSpot, setPendingTextSpot] = useState<{
     pageIndex: number;
     xPt: number;
@@ -179,6 +182,25 @@ function App(): React.JSX.Element {
     }
   };
 
+  const handleShapeDrawn = async (
+    pageIndex: number,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+  ): Promise<void> => {
+    if (!pdfBytes || !shapeMode) return;
+    try {
+      const updated = await drawShape(pdfBytes, pageIndex, shapeMode, x1, y1, x2, y2);
+      setPdfBytes(updated);
+      setIsDirty(true);
+      toast.success(`図形を追加しました`);
+    } catch (err) {
+      console.error(err);
+      toast.error('図形の追加に失敗しました');
+    }
+  };
+
   const handleImagesToPdf = async (): Promise<void> => {
     try {
       const picked = await window.laipdf.file.pickImages();
@@ -301,12 +323,50 @@ function App(): React.JSX.Element {
                     type="button"
                     onClick={() => {
                       setStampMode(null);
+                      setShapeMode(null);
                       setTextMode(true);
                     }}
                     className="px-3 py-1.5 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 rounded font-medium"
                   >
                     ✏ テキスト追加
                   </button>
+                )}
+                {shapeMode ? (
+                  <button
+                    type="button"
+                    onClick={() => setShapeMode(null)}
+                    className="px-3 py-1.5 text-sm bg-red-100 hover:bg-red-200 text-red-700 rounded font-medium"
+                  >
+                    ✕ 図形解除
+                  </button>
+                ) : (
+                  <div className="relative group">
+                    <button
+                      type="button"
+                      className="px-3 py-1.5 text-sm bg-red-50 hover:bg-red-100 text-red-700 rounded font-medium"
+                    >
+                      🔷 図形 ▾
+                    </button>
+                    <div className="absolute right-0 mt-1 w-44 bg-white border border-gray-200 rounded shadow-lg hidden group-hover:block z-20">
+                      {(['rect', 'circle', 'arrow', 'highlight'] as ShapeKind[]).map((k) => (
+                        <button
+                          key={k}
+                          type="button"
+                          onClick={() => {
+                            setStampMode(null);
+                            setTextMode(false);
+                            setShapeMode(k);
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100"
+                        >
+                          {k === 'rect' && '⬜ 矩形 (赤枠)'}
+                          {k === 'circle' && '⭕ 円 (赤枠)'}
+                          {k === 'arrow' && '➡ 矢印 (赤)'}
+                          {k === 'highlight' && '🖍 マーカー (黄)'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
                 {stampMode ? (
                   <button
@@ -321,6 +381,7 @@ function App(): React.JSX.Element {
                     type="button"
                     onClick={() => {
                       setTextMode(false);
+                      setShapeMode(null);
                       setStampModalOpen(true);
                     }}
                     className="px-3 py-1.5 text-sm bg-orange-50 hover:bg-orange-100 text-orange-700 rounded font-medium"
@@ -386,8 +447,10 @@ function App(): React.JSX.Element {
                   onTotalPagesChange={handleTotalPagesChange}
                   stampMode={stampMode}
                   textMode={textMode}
+                  shapeMode={shapeMode}
                   onStampPlaced={handleStampPlaced}
                   onTextPlaced={handleTextPlaced}
+                  onShapeDrawn={handleShapeDrawn}
                 />
               </div>
             </div>

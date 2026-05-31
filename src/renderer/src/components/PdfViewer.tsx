@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type { StampMeta } from '../../../preload';
+import type { ShapeKind } from '../services/pdfService';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -12,8 +13,16 @@ interface PdfViewerProps {
   onTotalPagesChange: (n: number) => void;
   stampMode: StampMeta | null;
   textMode: boolean;
+  shapeMode: ShapeKind | null;
   onStampPlaced: (pageIndex: number, xPt: number, yPt: number, sizePt: number) => void;
   onTextPlaced: (pageIndex: number, xPt: number, yPt: number) => void;
+  onShapeDrawn: (
+    pageIndex: number,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+  ) => void;
 }
 
 export function PdfViewer({
@@ -23,14 +32,17 @@ export function PdfViewer({
   onTotalPagesChange,
   stampMode,
   textMode,
+  shapeMode,
   onStampPlaced,
   onTextPlaced,
+  onShapeDrawn,
 }: PdfViewerProps): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1.2);
   const [pdf, setPdf] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [pagePtSize, setPagePtSize] = useState<{ w: number; h: number } | null>(null);
+  const [drag, setDrag] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,20 +93,59 @@ export function PdfViewer({
     };
   }, [pdf, pageNum, scale]);
 
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>): void => {
-    if (!pagePtSize || !canvasRef.current) return;
+  const getPt = (e: React.MouseEvent<HTMLCanvasElement>): { x: number; y: number } | null => {
+    if (!canvasRef.current) return null;
     const rect = canvasRef.current.getBoundingClientRect();
-    const cssX = e.clientX - rect.left;
-    const cssY = e.clientY - rect.top;
-    const xPt = cssX / scale;
-    const yPt = cssY / scale;
+    return {
+      x: (e.clientX - rect.left) / scale,
+      y: (e.clientY - rect.top) / scale,
+    };
+  };
 
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>): void => {
+    if (!shapeMode) return;
+    const p = getPt(e);
+    if (!p) return;
+    setDrag({ x1: p.x, y1: p.y, x2: p.x, y2: p.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>): void => {
+    if (!drag) return;
+    const p = getPt(e);
+    if (!p) return;
+    setDrag({ ...drag, x2: p.x, y2: p.y });
+  };
+
+  const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>): void => {
+    if (!drag || !shapeMode) {
+      setDrag(null);
+      return;
+    }
+    const p = getPt(e);
+    if (p && Math.hypot(p.x - drag.x1, p.y - drag.y1) > 4) {
+      onShapeDrawn(pageNum - 1, drag.x1, drag.y1, p.x, p.y);
+    }
+    setDrag(null);
+  };
+
+  const handleClick = (e: React.MouseEvent<HTMLCanvasElement>): void => {
+    if (shapeMode) return; // 図形モード中は click 無視 (drag で処理)
+    if (!pagePtSize) return;
+    const p = getPt(e);
+    if (!p) return;
     if (stampMode) {
       const sizePt = 70;
-      onStampPlaced(pageNum - 1, xPt - sizePt / 2, yPt - sizePt / 2, sizePt);
+      onStampPlaced(pageNum - 1, p.x - sizePt / 2, p.y - sizePt / 2, sizePt);
     } else if (textMode) {
-      onTextPlaced(pageNum - 1, xPt, yPt);
+      onTextPlaced(pageNum - 1, p.x, p.y);
     }
+  };
+
+  const shapeLabel: Record<ShapeKind, string> = {
+    rect: '⬜ 矩形',
+    circle: '⭕ 円',
+    arrow: '➡ 矢印',
+    highlight: '🖍 マーカー',
   };
 
   return (
@@ -123,15 +174,18 @@ export function PdfViewer({
         {stampMode && (
           <div className="ml-4 flex items-center gap-2 px-3 py-1 bg-orange-50 border border-orange-300 rounded">
             <img src={stampMode.dataUrl} alt="" className="w-6 h-6 object-contain" />
-            <span className="text-xs text-orange-700">
-              押印モード「{stampMode.name}」— PDF クリックで押印
-            </span>
+            <span className="text-xs text-orange-700">押印モード「{stampMode.name}」</span>
           </div>
         )}
         {textMode && (
           <div className="ml-4 px-3 py-1 bg-blue-50 border border-blue-300 rounded">
-            <span className="text-xs text-blue-700">
-              ✏ テキスト追加モード — PDF クリックで入力
+            <span className="text-xs text-blue-700">✏ テキスト追加モード</span>
+          </div>
+        )}
+        {shapeMode && (
+          <div className="ml-4 px-3 py-1 bg-red-50 border border-red-300 rounded">
+            <span className="text-xs text-red-700">
+              {shapeLabel[shapeMode]} モード — ドラッグして範囲指定
             </span>
           </div>
         )}
@@ -156,11 +210,29 @@ export function PdfViewer({
       </div>
 
       <div className="flex-1 overflow-auto p-6 flex items-start justify-center">
-        <canvas
-          ref={canvasRef}
-          onClick={handleCanvasClick}
-          className={`shadow-xl bg-white ${stampMode || textMode ? 'cursor-crosshair' : ''}`}
-        />
+        <div className="relative">
+          <canvas
+            ref={canvasRef}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={() => setDrag(null)}
+            onClick={handleClick}
+            className={`shadow-xl bg-white ${stampMode || textMode || shapeMode ? 'cursor-crosshair' : ''}`}
+          />
+          {/* ドラッグプレビュー */}
+          {drag && shapeMode && (
+            <div
+              className="absolute pointer-events-none border-2 border-dashed border-red-500 bg-red-100/20"
+              style={{
+                left: Math.min(drag.x1, drag.x2) * scale,
+                top: Math.min(drag.y1, drag.y2) * scale,
+                width: Math.abs(drag.x2 - drag.x1) * scale,
+                height: Math.abs(drag.y2 - drag.y1) * scale,
+              }}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
