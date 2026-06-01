@@ -59,11 +59,15 @@ export function PdfViewer({
   onDeleteAnnotation,
 }: PdfViewerProps): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const textLayerRef = useRef<HTMLDivElement>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1.2);
   const [pdf, setPdf] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [pagePtSize, setPagePtSize] = useState<{ w: number; h: number } | null>(null);
   const [drag, setDrag] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+
+  // 編集モード中はテキスト選択を無効にしてクリック競合を防ぐ
+  const anyEditMode = !!(stampMode || textMode || shapeMode || whiteRectMode || snapshotMode);
 
   useEffect(() => {
     let cancelled = false;
@@ -88,29 +92,68 @@ export function PdfViewer({
   useEffect(() => {
     if (!pdf || !canvasRef.current) return;
     let renderTask: pdfjsLib.RenderTask | null = null;
+    let textTask: { cancel?: () => void; promise?: Promise<void> } | null = null;
     let cancelled = false;
-    (async () => {
+    // ズーム連続変更時の負荷軽減 (50ms debounce)
+    const timer = setTimeout(async () => {
       try {
         const page = await pdf.getPage(pageNum);
         if (cancelled) return;
         const ptViewport = page.getViewport({ scale: 1 });
         setPagePtSize({ w: ptViewport.width, h: ptViewport.height });
+
+        // 高 DPI 対応: 描画解像度を DPR 倍に、CSS サイズは scale 通り
+        // (Canvas をできるだけ高解像度で描画 → CSS で縮小して Retina 品質に)
+        const dpr = Math.max(window.devicePixelRatio || 1, 1.5); // 最低 1.5x 描画でフォントくっきり
         const viewport = page.getViewport({ scale });
         const canvas = canvasRef.current!;
-        const ctx = canvas.getContext('2d')!;
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d', { alpha: false })!;
+        // 内部解像度を 整数 で
+        canvas.width = Math.round(viewport.width * dpr);
+        canvas.height = Math.round(viewport.height * dpr);
+        canvas.style.width = `${viewport.width}px`;
+        canvas.style.height = `${viewport.height}px`;
+        // 高品質スムージング
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
         renderTask = page.render({ canvasContext: ctx, viewport });
         await renderTask.promise;
+
+        // テキストレイヤー (選択可能な透明テキスト)
+        if (textLayerRef.current && !cancelled) {
+          textLayerRef.current.innerHTML = '';
+          textLayerRef.current.style.width = `${viewport.width}px`;
+          textLayerRef.current.style.height = `${viewport.height}px`;
+          const textContent = await page.getTextContent();
+          if (cancelled) return;
+          // PDF.js v4: renderTextLayer の代わりに TextLayer クラスを使う
+          // ただし v4 では関数版 renderTextLayer もまだ存在する
+          const fn = (pdfjsLib as unknown as {
+            renderTextLayer?: (params: object) => { promise: Promise<void>; cancel?: () => void };
+          }).renderTextLayer;
+          if (fn) {
+            textTask = fn({
+              textContentSource: textContent,
+              container: textLayerRef.current,
+              viewport,
+              textDivs: [],
+            });
+            await textTask?.promise;
+          }
+        }
       } catch (err) {
         if ((err as { name?: string })?.name !== 'RenderingCancelledException') {
           console.error('[PdfViewer] render error', err);
         }
       }
-    })();
+    }, 50);
     return () => {
       cancelled = true;
+      clearTimeout(timer);
       renderTask?.cancel();
+      textTask?.cancel?.();
     };
   }, [pdf, pageNum, scale]);
 
@@ -269,7 +312,16 @@ export function PdfViewer({
             onMouseUp={handleMouseUp}
             onMouseLeave={() => setDrag(null)}
             onClick={handleClick}
-            className={`shadow-xl bg-white ${stampMode || textMode || shapeMode || whiteRectMode || snapshotMode ? 'cursor-crosshair' : ''}`}
+            className={`shadow-xl bg-white block ${stampMode || textMode || shapeMode || whiteRectMode || snapshotMode ? 'cursor-crosshair' : ''}`}
+          />
+          {/* テキストレイヤー (選択・コピー可能) */}
+          <div
+            ref={textLayerRef}
+            className="pdf-text-layer absolute top-0 left-0"
+            style={{
+              pointerEvents: anyEditMode ? 'none' : 'auto',
+              userSelect: anyEditMode ? 'none' : 'text',
+            }}
           />
           {/* 注釈レイヤー (テキスト・印鑑をドラッグで移動) */}
           <AnnotationLayer

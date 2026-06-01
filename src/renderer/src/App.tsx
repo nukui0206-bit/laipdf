@@ -14,7 +14,10 @@ import { SignatureDialog } from './components/SignatureDialog';
 import { OcrPanel } from './components/OcrPanel';
 import { CompressDialog } from './components/CompressDialog';
 import { ToolSidebar } from './components/ToolSidebar';
+import { PrintDialog } from './components/PrintDialog';
 import { Undo2, Save, X as XIcon, FileText, Settings, Printer } from 'lucide-react';
+// resources/logo.png を src/renderer/src/assets/ にコピー済みのものを参照
+import logoUrl from './assets/logo.png';
 import type { StampMeta, LicenseInfo } from '../../preload';
 import {
   deletePage,
@@ -44,6 +47,7 @@ function App(): React.JSX.Element {
   const [signatureOpen, setSignatureOpen] = useState(false);
   const [ocrOpen, setOcrOpen] = useState(false);
   const [compressOpen, setCompressOpen] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [shapeColor, setShapeColor] = useState<{ r: number; g: number; b: number; label: string }>({
     r: 0.85, g: 0.1, b: 0.1, label: '赤',
@@ -421,22 +425,9 @@ function App(): React.JSX.Element {
     }
   };
 
-  const handlePrint = async (): Promise<void> => {
+  const handlePrint = (): void => {
     if (!pdfBytes) return;
-    try {
-      // 注釈レイヤーを焼き込んでから印刷
-      const finalBytes =
-        annotations.length > 0
-          ? await flattenAnnotations(pdfBytes, annotations)
-          : pdfBytes;
-      const result = await window.laipdf.file.printPdf(finalBytes);
-      if (result.ok) {
-        toast.success('印刷を送信しました');
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error('印刷に失敗しました');
-    }
+    setPrintOpen(true);
   };
 
   const handleSave = async (): Promise<void> => {
@@ -487,9 +478,7 @@ function App(): React.JSX.Element {
 
         <header className="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded bg-brand-600 flex items-center justify-center">
-              <FileText size={16} strokeWidth={2} className="text-white" />
-            </div>
+            <img src={logoUrl} alt="L'aide" className="w-7 h-7 object-contain" />
             <h1 className="text-base font-bold text-gray-800">LaiPDF</h1>
             <span className="text-xs text-gray-400 ml-1">v0.1.0</span>
           </div>
@@ -497,7 +486,7 @@ function App(): React.JSX.Element {
           <div className="flex-1 flex items-center justify-center">
             {pdfBytes && (
               <div className="flex items-center gap-2 px-3 py-1 bg-gray-50 rounded text-xs text-gray-600 max-w-md truncate">
-                <FileText size={12} strokeWidth={1.5} />
+                <FileText size={12} strokeWidth={1.5} className="shrink-0" />
                 <span className="truncate">{fileName}</span>
                 {isDirty && <span className="text-orange-500 ml-1">●</span>}
               </div>
@@ -749,6 +738,16 @@ function App(): React.JSX.Element {
             pdfBytes={pdfBytes}
             currentPage={currentPage}
             totalPages={totalPages}
+          />
+        )}
+        {pdfBytes && (
+          <PrintDialog
+            open={printOpen}
+            onClose={() => setPrintOpen(false)}
+            pdfBytes={pdfBytes}
+            annotations={annotations}
+            totalPages={totalPages}
+            currentPage={currentPage}
           />
         )}
         {pdfBytes && (

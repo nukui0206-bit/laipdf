@@ -34,8 +34,23 @@ const laipdf = {
       canceled: boolean
       files?: Array<{ name: string; type: 'png' | 'jpg'; bytes: Uint8Array }>
     }> => ipcRenderer.invoke('file:pick-images'),
-    printPdf: (bytes: Uint8Array): Promise<{ ok: boolean }> =>
-      ipcRenderer.invoke('file:print-pdf', bytes)
+    listPrinters: (): Promise<Array<{ name: string; displayName: string; isDefault: boolean }>> =>
+      ipcRenderer.invoke('print:list-printers'),
+    printHtml: (
+      html: string,
+      opts: {
+        deviceName: string
+        copies: number
+        pageRanges?: Array<{ from: number; to: number }>
+        color: boolean
+        landscape: boolean | 'auto'
+        scaleFactor: number
+        duplex: 'simplex' | 'shortEdge' | 'longEdge'
+        pagesPerSheet?: 1 | 2 | 4 | 6 | 9 | 16
+        silent: boolean
+      }
+    ): Promise<{ ok: boolean; message?: string }> =>
+      ipcRenderer.invoke('file:print-html', html, opts)
   },
   fonts: {
     getJp: (): Promise<Uint8Array | null> => ipcRenderer.invoke('fonts:get-jp')

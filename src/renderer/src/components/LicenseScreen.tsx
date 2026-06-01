@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { LicenseInfo } from '../../../preload';
+import logoUrl from '../assets/logo.png';
 
 interface LicenseScreenProps {
   onActivated: (license: LicenseInfo) => void;
@@ -44,10 +45,10 @@ export function LicenseScreen({ onActivated }: LicenseScreenProps): React.JSX.El
   };
 
   return (
-    <div className="h-full flex items-center justify-center bg-gradient-to-br from-brand-50 to-white p-8">
+    <div className="h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-white p-8">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
         <div className="text-center mb-6">
-          <div className="text-5xl mb-2">📄</div>
+          <img src={logoUrl} alt="L'aide" className="w-16 h-16 object-contain mx-auto mb-2" />
           <h1 className="text-2xl font-bold text-gray-800">LaiPDF</h1>
           <p className="text-sm text-gray-500 mt-1">Laiweb 契約者向け PDF 編集ツール</p>
         </div>

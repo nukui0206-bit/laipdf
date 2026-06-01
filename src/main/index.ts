@@ -291,40 +291,84 @@ app.whenReady().then(() => {
   )
 
   // ===== 印刷 =====
-  // 注釈焼き込み済みの PDF bytes を受け取り、非表示の BrowserWindow で開いて印刷ダイアログ表示
-  ipcMain.handle('file:print-pdf', async (_event, bytes: Uint8Array): Promise<{ ok: boolean }> => {
-    try {
-      const { tmpdir } = await import('os')
-      const tmpPath = join(tmpdir(), `laipdf_print_${Date.now()}.pdf`)
-      await writeFile(tmpPath, Buffer.from(bytes))
 
-      const printWin = new BrowserWindow({
-        show: false,
-        webPreferences: {
-          plugins: true, // PDF Viewer Plugin を有効化
-          sandbox: false,
-        },
-      })
-      await printWin.loadURL(`file:///${tmpPath.replace(/\\/g, '/')}`)
-      // PDF レンダリング待ち
-      await new Promise((r) => setTimeout(r, 800))
-      return await new Promise<{ ok: boolean }>((resolve) => {
-        printWin.webContents.print(
-          { silent: false, printBackground: true, deviceName: '' },
-          (success, failureReason) => {
+  // プリンタ一覧取得 (アプリ内の任意の BrowserWindow から)
+  ipcMain.handle(
+    'print:list-printers',
+    async (): Promise<Array<{ name: string; displayName: string; isDefault: boolean }>> => {
+      const wins = BrowserWindow.getAllWindows()
+      const win = wins[0]
+      if (!win) return []
+      const list = await win.webContents.getPrintersAsync()
+      return list.map((p) => ({
+        name: p.name,
+        displayName: p.displayName ?? p.name,
+        isDefault: (p as { isDefault?: boolean }).isDefault ?? false,
+      }))
+    },
+  )
+
+  interface PrintOptions {
+    deviceName: string
+    copies: number
+    pageRanges?: Array<{ from: number; to: number }>
+    color: boolean
+    landscape: boolean | 'auto'
+    scaleFactor: number
+    duplex: 'simplex' | 'shortEdge' | 'longEdge'
+    pagesPerSheet?: 1 | 2 | 4 | 6 | 9 | 16
+    silent: boolean
+  }
+
+  ipcMain.handle(
+    'file:print-html',
+    async (_event, html: string, opts: PrintOptions): Promise<{ ok: boolean; message?: string }> => {
+      try {
+        const { tmpdir } = await import('os')
+        const tmpPath = join(tmpdir(), `laipdf_print_${Date.now()}.html`)
+        await writeFile(tmpPath, Buffer.from(html, 'utf-8'))
+
+        const printWin = new BrowserWindow({
+          show: false,
+          webPreferences: { sandbox: false },
+        })
+        await printWin.loadURL(`file:///${tmpPath.replace(/\\/g, '/')}`)
+        // HTML レンダリング完了待ち
+        await new Promise((r) => setTimeout(r, 300))
+
+        // Electron Print options に変換
+        const electronOpts: Electron.WebContentsPrintOptions = {
+          silent: opts.silent,
+          printBackground: true,
+          deviceName: opts.deviceName || undefined,
+          color: opts.color,
+          copies: Math.max(1, opts.copies),
+          landscape: opts.landscape === 'auto' ? undefined : opts.landscape,
+          scaleFactor: opts.scaleFactor,
+          duplexMode: opts.duplex,
+        }
+        if (opts.pageRanges && opts.pageRanges.length > 0) {
+          electronOpts.pageRanges = opts.pageRanges
+        }
+        if (opts.pagesPerSheet && opts.pagesPerSheet > 1) {
+          electronOpts.pagesPerSheet = opts.pagesPerSheet
+        }
+
+        return await new Promise<{ ok: boolean; message?: string }>((resolve) => {
+          printWin.webContents.print(electronOpts, (success, failureReason) => {
             if (!success && failureReason && failureReason !== 'cancelled') {
               console.error('[print] failure:', failureReason)
             }
             printWin.close()
-            resolve({ ok: success })
-          },
-        )
-      })
-    } catch (err) {
-      console.error('[print] error', err)
-      return { ok: false }
-    }
-  })
+            resolve({ ok: success, message: failureReason })
+          })
+        })
+      } catch (err) {
+        console.error('[print] error', err)
+        return { ok: false, message: (err as Error).message }
+      }
+    },
+  )
 
   ipcMain.handle(
     'file:pick-images',
