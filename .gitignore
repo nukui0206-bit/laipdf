@@ -4,3 +4,7 @@ out
 .DS_Store
 .eslintcache
 *.log*
+
+# Generated manual PDF (re-build via `npm run manual`)
+docs/*.pdf
+docs/_*.html
