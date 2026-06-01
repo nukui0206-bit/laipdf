@@ -13,6 +13,8 @@ import { SearchPanel } from './components/SearchPanel';
 import { SignatureDialog } from './components/SignatureDialog';
 import { OcrPanel } from './components/OcrPanel';
 import { CompressDialog } from './components/CompressDialog';
+import { ToolSidebar } from './components/ToolSidebar';
+import { Undo2, Save, X as XIcon, FileText, Settings, Printer } from 'lucide-react';
 import type { StampMeta, LicenseInfo } from '../../preload';
 import {
   deletePage,
@@ -21,11 +23,9 @@ import {
   mergePdfs,
   splitPdf,
   imagesToPdf,
-  drawShape,
   flattenAnnotations,
-  type ShapeKind,
 } from './services/pdfService';
-import type { Annotation } from './types/annotation';
+import type { Annotation, ShapeKind } from './types/annotation';
 
 function App(): React.JSX.Element {
   const [pdfBytes, setPdfBytes] = useState<Uint8Array | null>(null);
@@ -39,6 +39,7 @@ function App(): React.JSX.Element {
   const [shapeMode, setShapeMode] = useState<ShapeKind | null>(null);
   const [whiteRectMode, setWhiteRectMode] = useState(false);
   const [snapshotMode, setSnapshotMode] = useState(false);
+  const [shapeMenuOpen, setShapeMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [signatureOpen, setSignatureOpen] = useState(false);
   const [ocrOpen, setOcrOpen] = useState(false);
@@ -85,6 +86,17 @@ function App(): React.JSX.Element {
         if (!pdfBytes) return;
         e.preventDefault();
         setSearchOpen(true);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && !e.shiftKey) {
+        if (!pdfBytes) return;
+        if (isInput) return;
+        e.preventDefault();
+        void handleSave();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+        if (!pdfBytes) return;
+        e.preventDefault();
+        void handlePrint();
       }
       if (e.key === 'Escape' && searchOpen) {
         setSearchOpen(false);
@@ -325,36 +337,34 @@ function App(): React.JSX.Element {
     toast.success('白塗りを配置 (上からテキスト追加できます)');
   };
 
-  const handleShapeDrawn = async (
+  const handleShapeDrawn = (
     pageIndex: number,
     x1: number,
     y1: number,
     x2: number,
     y2: number,
-  ): Promise<void> => {
+  ): void => {
     if (!pdfBytes || !shapeMode) return;
-    try {
-      pushHistory(pdfBytes);
-      const updated = await drawShape(
-        pdfBytes,
+    setAnnotations((prev) => [
+      ...prev,
+      {
+        id: `shape-${Date.now()}-${Math.random()}`,
+        kind: 'shape',
         pageIndex,
-        shapeMode,
-        x1,
-        y1,
-        x2,
-        y2,
-        shapeMode === 'highlight'
-          ? { r: 1, g: 0.95, b: 0 }
-          : { r: shapeColor.r, g: shapeColor.g, b: shapeColor.b },
+        shape: shapeMode,
+        x: x1,
+        y: y1,
+        width: x2 - x1,
+        height: y2 - y1,
+        color:
+          shapeMode === 'highlight'
+            ? { r: 1, g: 0.95, b: 0 }
+            : { r: shapeColor.r, g: shapeColor.g, b: shapeColor.b },
         lineWidth,
-      );
-      setPdfBytes(updated);
-      setIsDirty(true);
-      toast.success(`図形を追加しました`);
-    } catch (err) {
-      console.error(err);
-      toast.error('図形の追加に失敗しました');
-    }
+      },
+    ]);
+    setIsDirty(true);
+    toast.success('図形を配置 (ドラッグで移動可)');
   };
 
   const handleImagesToPdf = async (): Promise<void> => {
@@ -411,6 +421,24 @@ function App(): React.JSX.Element {
     }
   };
 
+  const handlePrint = async (): Promise<void> => {
+    if (!pdfBytes) return;
+    try {
+      // 注釈レイヤーを焼き込んでから印刷
+      const finalBytes =
+        annotations.length > 0
+          ? await flattenAnnotations(pdfBytes, annotations)
+          : pdfBytes;
+      const result = await window.laipdf.file.printPdf(finalBytes);
+      if (result.ok) {
+        toast.success('印刷を送信しました');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('印刷に失敗しました');
+    }
+  };
+
   const handleSave = async (): Promise<void> => {
     if (!pdfBytes) return;
     try {
@@ -457,272 +485,144 @@ function App(): React.JSX.Element {
           }}
         />
 
-        <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm">
+        <header className="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">📄</span>
-            <h1 className="text-lg font-bold text-gray-800">LaiPDF</h1>
-            <span className="text-xs text-gray-400">v0.1.0 (dev)</span>
+            <div className="w-7 h-7 rounded bg-brand-600 flex items-center justify-center">
+              <FileText size={16} strokeWidth={2} className="text-white" />
+            </div>
+            <h1 className="text-base font-bold text-gray-800">LaiPDF</h1>
+            <span className="text-xs text-gray-400 ml-1">v0.1.0</span>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setStampModalOpen(true)}
-              className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded font-medium"
-              title="印鑑を登録・管理"
-            >
-              🖼 印鑑管理
-            </button>
+
+          <div className="flex-1 flex items-center justify-center">
+            {pdfBytes && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-gray-50 rounded text-xs text-gray-600 max-w-md truncate">
+                <FileText size={12} strokeWidth={1.5} />
+                <span className="truncate">{fileName}</span>
+                {isDirty && <span className="text-orange-500 ml-1">●</span>}
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1.5">
             {pdfBytes && (
               <>
-                {/* Undo */}
                 <button
                   type="button"
                   onClick={handleUndo}
                   disabled={undoStack.length === 0}
-                  className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-40 rounded font-medium"
-                  title="Ctrl+Z で元に戻す"
+                  className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 text-gray-700"
+                  title="元に戻す (Ctrl+Z)"
                 >
-                  ↶ 元に戻す ({undoStack.length})
-                </button>
-
-                {/* 色選択 (図形 / マーカー以外) */}
-                {(shapeMode && shapeMode !== 'highlight') || textMode ? (
-                  <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded">
-                    <span className="text-xs text-gray-500">色:</span>
-                    {[
-                      { r: 0.85, g: 0.10, b: 0.10, label: '赤' },
-                      { r: 0.10, g: 0.30, b: 0.85, label: '青' },
-                      { r: 0.10, g: 0.55, b: 0.20, label: '緑' },
-                      { r: 0,    g: 0,    b: 0,    label: '黒' },
-                    ].map((c) => (
-                      <button
-                        key={c.label}
-                        type="button"
-                        onClick={() => setShapeColor(c)}
-                        className={`w-5 h-5 rounded border-2 ${shapeColor.label === c.label ? 'border-gray-800 scale-110' : 'border-gray-300'}`}
-                        style={{ backgroundColor: `rgb(${c.r * 255},${c.g * 255},${c.b * 255})` }}
-                        title={c.label}
-                      />
-                    ))}
-                    <span className="ml-2 text-xs text-gray-500">線:</span>
-                    {[1, 2, 4, 6].map((w) => (
-                      <button
-                        key={w}
-                        type="button"
-                        onClick={() => setLineWidth(w)}
-                        className={`px-2 py-0.5 text-xs rounded ${lineWidth === w ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 border border-gray-300'}`}
-                      >
-                        {w}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-
-                {textMode ? (
-                  <button
-                    type="button"
-                    onClick={() => setTextMode(false)}
-                    className="px-3 py-1.5 text-sm bg-blue-100 hover:bg-blue-200 text-blue-700 rounded font-medium"
-                  >
-                    ✕ テキスト解除
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStampMode(null);
-                      setShapeMode(null);
-                      setWhiteRectMode(false);
-                      setTextMode(true);
-                    }}
-                    className="px-3 py-1.5 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 rounded font-medium"
-                  >
-                    ✏ テキスト追加
-                  </button>
-                )}
-                {whiteRectMode ? (
-                  <button
-                    type="button"
-                    onClick={() => setWhiteRectMode(false)}
-                    className="px-3 py-1.5 text-sm bg-gray-300 hover:bg-gray-400 text-gray-800 rounded font-medium"
-                  >
-                    ✕ 白塗り解除
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStampMode(null);
-                      setTextMode(false);
-                      setShapeMode(null);
-                      setWhiteRectMode(true);
-                    }}
-                    className="px-3 py-1.5 text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 rounded font-medium"
-                    title="既存文字を白く隠す（上からテキストで書き換え）"
-                  >
-                    ⌫ 白塗り編集
-                  </button>
-                )}
-                {shapeMode ? (
-                  <button
-                    type="button"
-                    onClick={() => setShapeMode(null)}
-                    className="px-3 py-1.5 text-sm bg-red-100 hover:bg-red-200 text-red-700 rounded font-medium"
-                  >
-                    ✕ 図形解除
-                  </button>
-                ) : (
-                  <div className="relative group">
-                    <button
-                      type="button"
-                      className="px-3 py-1.5 text-sm bg-red-50 hover:bg-red-100 text-red-700 rounded font-medium"
-                    >
-                      🔷 図形 ▾
-                    </button>
-                    <div className="absolute right-0 mt-1 w-44 bg-white border border-gray-200 rounded shadow-lg hidden group-hover:block z-20">
-                      {(['rect', 'circle', 'arrow', 'highlight'] as ShapeKind[]).map((k) => (
-                        <button
-                          key={k}
-                          type="button"
-                          onClick={() => {
-                            setStampMode(null);
-                            setTextMode(false);
-                            setShapeMode(k);
-                          }}
-                          className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100"
-                        >
-                          {k === 'rect' && '⬜ 矩形 (赤枠)'}
-                          {k === 'circle' && '⭕ 円 (赤枠)'}
-                          {k === 'arrow' && '➡ 矢印 (赤)'}
-                          {k === 'highlight' && '🖍 マーカー (黄)'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {stampMode ? (
-                  <button
-                    type="button"
-                    onClick={() => setStampMode(null)}
-                    className="px-3 py-1.5 text-sm bg-orange-100 hover:bg-orange-200 text-orange-700 rounded font-medium"
-                  >
-                    ✕ 押印モード解除
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTextMode(false);
-                      setShapeMode(null);
-                      setWhiteRectMode(false);
-                      setStampModalOpen(true);
-                    }}
-                    className="px-3 py-1.5 text-sm bg-orange-50 hover:bg-orange-100 text-orange-700 rounded font-medium"
-                  >
-                    🖌 押印する
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTextMode(false);
-                    setShapeMode(null);
-                    setSignatureOpen(true);
-                  }}
-                  className="px-3 py-1.5 text-sm bg-purple-50 hover:bg-purple-100 text-purple-700 rounded font-medium"
-                >
-                  ✍ 手書き署名
+                  <Undo2 size={18} strokeWidth={1.75} />
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSearchOpen((v) => !v)}
-                  className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded font-medium"
-                  title="Ctrl+F でも開く"
+                  onClick={handlePrint}
+                  className="p-1.5 rounded hover:bg-gray-100 text-gray-700"
+                  title="印刷 (Ctrl+P)"
                 >
-                  🔍 検索
+                  <Printer size={18} strokeWidth={1.75} />
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setOcrOpen(true)}
-                  className="px-3 py-1.5 text-sm bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded font-medium"
-                  title="スキャン PDF などから文字を読み取り"
-                >
-                  📖 OCR
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCompressOpen(true)}
-                  className="px-3 py-1.5 text-sm bg-yellow-50 hover:bg-yellow-100 text-yellow-700 rounded font-medium"
-                  title="サイズを小さくする"
-                >
-                  🗜 圧縮
-                </button>
-                {snapshotMode ? (
-                  <button
-                    type="button"
-                    onClick={() => setSnapshotMode(false)}
-                    className="px-3 py-1.5 text-sm bg-cyan-200 hover:bg-cyan-300 text-cyan-800 rounded font-medium"
-                  >
-                    ✕ 範囲指定解除
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStampMode(null);
-                      setTextMode(false);
-                      setShapeMode(null);
-                      setWhiteRectMode(false);
-                      setSnapshotMode(true);
-                    }}
-                    className="px-3 py-1.5 text-sm bg-cyan-50 hover:bg-cyan-100 text-cyan-700 rounded font-medium"
-                    title="ドラッグした範囲を画像化"
-                  >
-                    📸 スナップショット
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={handleMerge}
-                  className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded font-medium"
-                  title="他の PDF を末尾に結合"
-                >
-                  🔗 結合
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSplitDialogOpen(true)}
-                  className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded font-medium"
-                  title="ページ範囲で分割"
-                >
-                  📤 分割
-                </button>
-                <span className="text-sm text-gray-600 truncate max-w-xs ml-2">
-                  {fileName}
-                  {isDirty && <span className="ml-1 text-orange-500">●</span>}
-                </span>
                 <button
                   type="button"
                   onClick={handleSave}
-                  className="px-4 py-1.5 text-sm bg-brand-600 hover:bg-brand-700 text-white rounded font-medium"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded text-sm font-medium"
                 >
-                  💾 保存
+                  <Save size={14} strokeWidth={2} />
+                  保存
                 </button>
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded text-gray-700"
+                  className="p-1.5 rounded hover:bg-gray-100 text-gray-500"
+                  title="閉じる"
                 >
-                  閉じる
+                  <XIcon size={18} strokeWidth={1.75} />
                 </button>
               </>
             )}
+            <button
+              type="button"
+              onClick={() => setStampModalOpen(true)}
+              className="p-1.5 rounded hover:bg-gray-100 text-gray-500"
+              title="設定・印鑑管理"
+            >
+              <Settings size={18} strokeWidth={1.75} />
+            </button>
           </div>
         </header>
+
+        {/* モード時の色・線幅サブツールバー */}
+        {pdfBytes && ((shapeMode && shapeMode !== 'highlight') || textMode) && (
+          <div className="bg-white border-b border-gray-200 px-4 py-1.5 flex items-center gap-3 text-xs">
+            <span className="text-gray-500">色:</span>
+            {[
+              { r: 0.85, g: 0.10, b: 0.10, label: '赤' },
+              { r: 0.10, g: 0.30, b: 0.85, label: '青' },
+              { r: 0.10, g: 0.55, b: 0.20, label: '緑' },
+              { r: 0,    g: 0,    b: 0,    label: '黒' },
+            ].map((c) => (
+              <button
+                key={c.label}
+                type="button"
+                onClick={() => setShapeColor(c)}
+                className={`w-5 h-5 rounded-full border-2 ${shapeColor.label === c.label ? 'border-gray-800 scale-110' : 'border-gray-300'}`}
+                style={{ backgroundColor: `rgb(${c.r * 255},${c.g * 255},${c.b * 255})` }}
+                title={c.label}
+              />
+            ))}
+            <span className="ml-2 text-gray-500">線幅:</span>
+            {[1, 2, 4, 6].map((w) => (
+              <button
+                key={w}
+                type="button"
+                onClick={() => setLineWidth(w)}
+                className={`px-2 py-0.5 rounded ${lineWidth === w ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600'}`}
+              >
+                {w}pt
+              </button>
+            ))}
+          </div>
+        )}
 
         <main className="flex-1 overflow-hidden bg-gray-100">
           {pdfBytes ? (
             <div className="flex h-full">
+              <ToolSidebar
+                textMode={textMode}
+                stampActive={stampMode !== null}
+                shapeActive={shapeMode !== null}
+                whiteRectMode={whiteRectMode}
+                snapshotMode={snapshotMode}
+                onOpenStamps={() => {
+                  setTextMode(false); setShapeMode(null); setWhiteRectMode(false); setSnapshotMode(false);
+                  setStampModalOpen(true);
+                }}
+                onOpenSignature={() => {
+                  setTextMode(false); setShapeMode(null); setWhiteRectMode(false); setSnapshotMode(false);
+                  setSignatureOpen(true);
+                }}
+                onToggleText={() => {
+                  if (textMode) setTextMode(false);
+                  else { setStampMode(null); setShapeMode(null); setWhiteRectMode(false); setSnapshotMode(false); setTextMode(true); }
+                }}
+                onOpenShapeMenu={() => setShapeMenuOpen(true)}
+                onToggleWhiteRect={() => {
+                  if (whiteRectMode) setWhiteRectMode(false);
+                  else { setStampMode(null); setTextMode(false); setShapeMode(null); setSnapshotMode(false); setWhiteRectMode(true); }
+                }}
+                onToggleSnapshot={() => {
+                  if (snapshotMode) setSnapshotMode(false);
+                  else { setStampMode(null); setTextMode(false); setShapeMode(null); setWhiteRectMode(false); setSnapshotMode(true); }
+                }}
+                onOpenSearch={() => setSearchOpen(true)}
+                onOpenOcr={() => setOcrOpen(true)}
+                onMerge={handleMerge}
+                onOpenSplit={() => setSplitDialogOpen(true)}
+                onImagesToPdf={handleImagesToPdf}
+                onOpenCompress={() => setCompressOpen(true)}
+              />
               <PageList
                 pdfBytes={pdfBytes}
                 currentPage={currentPage}
@@ -783,6 +683,51 @@ function App(): React.JSX.Element {
           onClose={() => setPendingTextSpot(null)}
           onSubmit={handleTextSubmit}
         />
+        {/* 図形選択モーダル */}
+        {shapeMenuOpen && (
+          <div
+            className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center"
+            onClick={() => setShapeMenuOpen(false)}
+          >
+            <div
+              className="bg-white rounded-lg shadow-2xl p-4 w-72"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-sm font-bold text-gray-700 mb-3">図形を選択</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {(['rect', 'circle', 'arrow', 'highlight'] as ShapeKind[]).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => {
+                      setStampMode(null);
+                      setTextMode(false);
+                      setWhiteRectMode(false);
+                      setSnapshotMode(false);
+                      setShapeMode(k);
+                      setShapeMenuOpen(false);
+                    }}
+                    className="flex flex-col items-center gap-1 p-3 border border-gray-200 hover:border-brand-500 hover:bg-brand-50 rounded text-sm"
+                  >
+                    <span className="text-2xl">
+                      {k === 'rect' && '⬜'}
+                      {k === 'circle' && '⭕'}
+                      {k === 'arrow' && '➡'}
+                      {k === 'highlight' && '🖍'}
+                    </span>
+                    <span className="text-xs">
+                      {k === 'rect' && '矩形'}
+                      {k === 'circle' && '円'}
+                      {k === 'arrow' && '矢印'}
+                      {k === 'highlight' && 'マーカー'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         <SplitDialog
           open={splitDialogOpen}
           onClose={() => setSplitDialogOpen(false)}

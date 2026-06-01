@@ -33,7 +33,9 @@ const laipdf = {
     pickImages: (): Promise<{
       canceled: boolean
       files?: Array<{ name: string; type: 'png' | 'jpg'; bytes: Uint8Array }>
-    }> => ipcRenderer.invoke('file:pick-images')
+    }> => ipcRenderer.invoke('file:pick-images'),
+    printPdf: (bytes: Uint8Array): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('file:print-pdf', bytes)
   },
   fonts: {
     getJp: (): Promise<Uint8Array | null> => ipcRenderer.invoke('fonts:get-jp')

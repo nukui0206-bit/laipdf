@@ -128,6 +128,119 @@ export function AnnotationLayer({
           );
         }
 
+        if (a.kind === 'shape') {
+          const minX = Math.min(a.x, a.x + a.width);
+          const minY = Math.min(a.y, a.y + a.height);
+          const absW = Math.abs(a.width);
+          const absH = Math.abs(a.height);
+          const colorCss = `rgb(${a.color.r * 255}, ${a.color.g * 255}, ${a.color.b * 255})`;
+          const boxLeft = minX * scale;
+          const boxTop = minY * scale;
+          const boxW = absW * scale;
+          const boxH = absH * scale;
+          return (
+            <div
+              key={a.id}
+              className={`absolute ${isSelected ? 'ring-2 ring-blue-500' : 'hover:ring-1 hover:ring-blue-300'}`}
+              style={{
+                left: boxLeft,
+                top: boxTop,
+                width: boxW,
+                height: boxH,
+                pointerEvents: 'auto',
+                cursor: 'move',
+              }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setSelectedId(a.id);
+                setDrag({
+                  id: a.id,
+                  mode: 'move',
+                  startMouseX: e.clientX,
+                  startMouseY: e.clientY,
+                  startX: a.x,
+                  startY: a.y,
+                  startW: a.width,
+                  startH: a.height,
+                });
+              }}
+            >
+              {a.shape === 'rect' && (
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{ border: `${a.lineWidth * scale}px solid ${colorCss}` }}
+                />
+              )}
+              {a.shape === 'circle' && (
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    border: `${a.lineWidth * scale}px solid ${colorCss}`,
+                    borderRadius: '50%',
+                  }}
+                />
+              )}
+              {a.shape === 'highlight' && (
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{ background: 'rgba(255, 240, 0, 0.4)' }}
+                />
+              )}
+              {a.shape === 'arrow' && (
+                <svg
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: a.x * scale - boxLeft,
+                    top: a.y * scale - boxTop,
+                    width: a.width * scale,
+                    height: a.height * scale,
+                    overflow: 'visible',
+                  }}
+                  preserveAspectRatio="none"
+                >
+                  <defs>
+                    <marker
+                      id={`arrowhead-${a.id}`}
+                      markerWidth="10"
+                      markerHeight="10"
+                      refX="8"
+                      refY="5"
+                      orient="auto"
+                    >
+                      <polygon points="0 0, 10 5, 0 10" fill={colorCss} />
+                    </marker>
+                  </defs>
+                  <line
+                    x1={0}
+                    y1={0}
+                    x2={a.width * scale}
+                    y2={a.height * scale}
+                    stroke={colorCss}
+                    strokeWidth={a.lineWidth * scale}
+                    markerEnd={`url(#arrowhead-${a.id})`}
+                  />
+                </svg>
+              )}
+              {isSelected && (
+                <>
+                  <button
+                    type="button"
+                    className="absolute -top-3 -right-3 w-6 h-6 bg-red-500 text-white rounded-full text-xs font-bold leading-none hover:bg-red-600"
+                    style={{ pointerEvents: 'auto' }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(a.id);
+                    }}
+                  >
+                    ×
+                  </button>
+                </>
+              )}
+            </div>
+          );
+        }
+
         if (a.kind === 'white-rect') {
           return (
             <div

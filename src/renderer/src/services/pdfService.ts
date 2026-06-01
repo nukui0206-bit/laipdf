@@ -183,107 +183,87 @@ export async function flattenAnnotations(
         color: rgb(1, 1, 1),
         borderWidth: 0,
       });
+    } else if (a.kind === 'shape') {
+      const col = rgb(a.color.r, a.color.g, a.color.b);
+      const left = a.x;
+      const right = a.x + a.width;
+      const yTop = a.y;
+      const yBottom = a.y + a.height;
+      const top = pageH - yTop;
+      const bottom = pageH - yBottom;
+      const w = Math.abs(a.width);
+      const h = Math.abs(a.height);
+      const drawLeft = Math.min(left, right);
+      const drawBottom = Math.min(top, bottom);
+      if (a.shape === 'rect') {
+        page.drawRectangle({
+          x: drawLeft,
+          y: drawBottom,
+          width: w,
+          height: h,
+          borderColor: col,
+          borderWidth: a.lineWidth,
+        });
+      } else if (a.shape === 'circle') {
+        const cx = (left + right) / 2;
+        const cy = (top + bottom) / 2;
+        page.drawEllipse({
+          x: cx,
+          y: cy,
+          xScale: w / 2,
+          yScale: h / 2,
+          borderColor: col,
+          borderWidth: a.lineWidth,
+        });
+      } else if (a.shape === 'arrow') {
+        // 矢印は (x, y) → (x+w, y+h) を直線で
+        const sx = a.x;
+        const sy = pageH - a.y;
+        const ex = a.x + a.width;
+        const ey = pageH - (a.y + a.height);
+        page.drawLine({
+          start: { x: sx, y: sy },
+          end: { x: ex, y: ey },
+          thickness: a.lineWidth,
+          color: col,
+        });
+        const dx = ex - sx;
+        const dy = ey - sy;
+        const len = Math.hypot(dx, dy);
+        if (len > 0) {
+          const angle = Math.atan2(dy, dx);
+          const arrowSize = Math.min(20, len / 3);
+          const a1 = angle + Math.PI - Math.PI / 6;
+          const a2 = angle + Math.PI + Math.PI / 6;
+          page.drawLine({
+            start: { x: ex, y: ey },
+            end: { x: ex + Math.cos(a1) * arrowSize, y: ey + Math.sin(a1) * arrowSize },
+            thickness: a.lineWidth,
+            color: col,
+          });
+          page.drawLine({
+            start: { x: ex, y: ey },
+            end: { x: ex + Math.cos(a2) * arrowSize, y: ey + Math.sin(a2) * arrowSize },
+            thickness: a.lineWidth,
+            color: col,
+          });
+        }
+      } else if (a.shape === 'highlight') {
+        page.drawRectangle({
+          x: drawLeft,
+          y: drawBottom,
+          width: w,
+          height: h,
+          color: rgb(1, 0.95, 0),
+          opacity: 0.4,
+        });
+      }
     }
   }
   return await pdf.save();
 }
 
-export type ShapeKind = 'rect' | 'circle' | 'arrow' | 'highlight';
-
-/**
- * PDF に図形を描画
- * 座標はページ左上を原点とする pt (Canvas 座標と同じ感覚)
- */
-export async function drawShape(
-  bytes: Uint8Array,
-  pageIndex: number,
-  shape: ShapeKind,
-  x1Top: number,
-  y1Top: number,
-  x2Top: number,
-  y2Top: number,
-  color: { r: number; g: number; b: number } = { r: 0.85, g: 0.1, b: 0.1 },
-  lineWidth = 2,
-): Promise<Uint8Array> {
-  const pdf = await PDFDocument.load(bytes);
-  const page = pdf.getPage(pageIndex);
-  const { height: pageH } = page.getSize();
-  // Y 軸反転（pdf-lib は左下原点）
-  const y1 = pageH - y1Top;
-  const y2 = pageH - y2Top;
-  const left = Math.min(x1Top, x2Top);
-  const right = Math.max(x1Top, x2Top);
-  const top = Math.max(y1, y2);
-  const bottom = Math.min(y1, y2);
-  const width = right - left;
-  const height = top - bottom;
-
-  const col = rgb(color.r, color.g, color.b);
-
-  if (shape === 'rect') {
-    page.drawRectangle({
-      x: left,
-      y: bottom,
-      width,
-      height,
-      borderColor: col,
-      borderWidth: lineWidth,
-    });
-  } else if (shape === 'circle') {
-    const cx = (left + right) / 2;
-    const cy = (top + bottom) / 2;
-    page.drawEllipse({
-      x: cx,
-      y: cy,
-      xScale: width / 2,
-      yScale: height / 2,
-      borderColor: col,
-      borderWidth: lineWidth,
-    });
-  } else if (shape === 'arrow') {
-    // 線
-    page.drawLine({
-      start: { x: x1Top, y: y1 },
-      end: { x: x2Top, y: y2 },
-      thickness: lineWidth,
-      color: col,
-    });
-    // 矢印先端（三角）: 終点に向かう角度から計算
-    const dx = x2Top - x1Top;
-    const dy = y2 - y1;
-    const len = Math.hypot(dx, dy);
-    if (len > 0) {
-      const angle = Math.atan2(dy, dx);
-      const arrowSize = Math.min(20, len / 3);
-      const a1 = angle + Math.PI - Math.PI / 6;
-      const a2 = angle + Math.PI + Math.PI / 6;
-      page.drawLine({
-        start: { x: x2Top, y: y2 },
-        end: { x: x2Top + Math.cos(a1) * arrowSize, y: y2 + Math.sin(a1) * arrowSize },
-        thickness: lineWidth,
-        color: col,
-      });
-      page.drawLine({
-        start: { x: x2Top, y: y2 },
-        end: { x: x2Top + Math.cos(a2) * arrowSize, y: y2 + Math.sin(a2) * arrowSize },
-        thickness: lineWidth,
-        color: col,
-      });
-    }
-  } else if (shape === 'highlight') {
-    // 半透明黄色 (PDF 標準の Highlight 注釈はないので塗り長方形で代用)
-    page.drawRectangle({
-      x: left,
-      y: bottom,
-      width,
-      height,
-      color: rgb(1, 0.95, 0),
-      opacity: 0.4,
-    });
-  }
-
-  return await pdf.save();
-}
+// 図形は注釈レイヤー (flattenAnnotations) で描画する。drawShape は廃止。
 
 /**
  * 画像ファイル群から PDF を作成。

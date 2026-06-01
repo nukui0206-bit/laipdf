@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type { StampMeta } from '../../../preload';
-import type { ShapeKind } from '../services/pdfService';
-import type { Annotation } from '../types/annotation';
+import type { Annotation, ShapeKind } from '../types/annotation';
 import { AnnotationLayer } from './AnnotationLayer';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;

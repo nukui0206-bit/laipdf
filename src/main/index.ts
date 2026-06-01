@@ -290,6 +290,42 @@ app.whenReady().then(() => {
     }
   )
 
+  // ===== 印刷 =====
+  // 注釈焼き込み済みの PDF bytes を受け取り、非表示の BrowserWindow で開いて印刷ダイアログ表示
+  ipcMain.handle('file:print-pdf', async (_event, bytes: Uint8Array): Promise<{ ok: boolean }> => {
+    try {
+      const { tmpdir } = await import('os')
+      const tmpPath = join(tmpdir(), `laipdf_print_${Date.now()}.pdf`)
+      await writeFile(tmpPath, Buffer.from(bytes))
+
+      const printWin = new BrowserWindow({
+        show: false,
+        webPreferences: {
+          plugins: true, // PDF Viewer Plugin を有効化
+          sandbox: false,
+        },
+      })
+      await printWin.loadURL(`file:///${tmpPath.replace(/\\/g, '/')}`)
+      // PDF レンダリング待ち
+      await new Promise((r) => setTimeout(r, 800))
+      return await new Promise<{ ok: boolean }>((resolve) => {
+        printWin.webContents.print(
+          { silent: false, printBackground: true, deviceName: '' },
+          (success, failureReason) => {
+            if (!success && failureReason && failureReason !== 'cancelled') {
+              console.error('[print] failure:', failureReason)
+            }
+            printWin.close()
+            resolve({ ok: success })
+          },
+        )
+      })
+    } catch (err) {
+      console.error('[print] error', err)
+      return { ok: false }
+    }
+  })
+
   ipcMain.handle(
     'file:pick-images',
     async (): Promise<{

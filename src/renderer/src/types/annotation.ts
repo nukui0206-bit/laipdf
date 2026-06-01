@@ -37,4 +37,25 @@ export interface WhiteRectAnnotation {
   height: number;
 }
 
-export type Annotation = TextAnnotation | StampAnnotation | WhiteRectAnnotation;
+export type ShapeKind = 'rect' | 'circle' | 'arrow' | 'highlight';
+
+export interface ShapeAnnotation {
+  id: string;
+  kind: 'shape';
+  pageIndex: number;
+  shape: ShapeKind;
+  // 矩形・円・マーカーは x,y,width,height で位置とサイズを管理
+  // 矢印も同じ箱で表現し、開始 = (x, y), 終点 = (x+width, y+height)
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: { r: number; g: number; b: number };
+  lineWidth: number;
+}
+
+export type Annotation =
+  | TextAnnotation
+  | StampAnnotation
+  | WhiteRectAnnotation
+  | ShapeAnnotation;
