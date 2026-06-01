@@ -12,6 +12,7 @@ import { LicenseScreen } from './components/LicenseScreen';
 import { SearchPanel } from './components/SearchPanel';
 import { SignatureDialog } from './components/SignatureDialog';
 import { OcrPanel } from './components/OcrPanel';
+import { CompressDialog } from './components/CompressDialog';
 import type { StampMeta, LicenseInfo } from '../../preload';
 import {
   deletePage,
@@ -37,9 +38,11 @@ function App(): React.JSX.Element {
   const [textMode, setTextMode] = useState(false);
   const [shapeMode, setShapeMode] = useState<ShapeKind | null>(null);
   const [whiteRectMode, setWhiteRectMode] = useState(false);
+  const [snapshotMode, setSnapshotMode] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [signatureOpen, setSignatureOpen] = useState(false);
   const [ocrOpen, setOcrOpen] = useState(false);
+  const [compressOpen, setCompressOpen] = useState(false);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [shapeColor, setShapeColor] = useState<{ r: number; g: number; b: number; label: string }>({
     r: 0.85, g: 0.1, b: 0.1, label: '赤',
@@ -262,6 +265,37 @@ function App(): React.JSX.Element {
     setAnnotations((prev) => prev.filter((a) => a.id !== id));
     setIsDirty(true);
     toast.success('削除しました');
+  };
+
+  const handleSnapshot = (croppedCanvas: HTMLCanvasElement): void => {
+    croppedCanvas.toBlob(async (blob) => {
+      if (!blob) {
+        toast.error('スナップショットに失敗しました');
+        return;
+      }
+      // クリップボードにコピー
+      let copied = false;
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        copied = true;
+      } catch (e) {
+        console.warn('clipboard copy failed', e);
+      }
+      // ファイル保存
+      try {
+        const buffer = new Uint8Array(await blob.arrayBuffer());
+        const suggested = `snapshot_${new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-')}.png`;
+        const result = await window.laipdf.file.savePdf(buffer, suggested);
+        if (result.saved) {
+          toast.success(copied ? 'クリップボードコピー + PNG 保存' : 'PNG として保存しました');
+        } else if (copied) {
+          toast.success('クリップボードにコピーしました');
+        }
+      } catch (err) {
+        console.error(err);
+      }
+      setSnapshotMode(false);
+    }, 'image/png');
   };
 
   const handleWhiteRectDrawn = (
@@ -617,6 +651,38 @@ function App(): React.JSX.Element {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setCompressOpen(true)}
+                  className="px-3 py-1.5 text-sm bg-yellow-50 hover:bg-yellow-100 text-yellow-700 rounded font-medium"
+                  title="サイズを小さくする"
+                >
+                  🗜 圧縮
+                </button>
+                {snapshotMode ? (
+                  <button
+                    type="button"
+                    onClick={() => setSnapshotMode(false)}
+                    className="px-3 py-1.5 text-sm bg-cyan-200 hover:bg-cyan-300 text-cyan-800 rounded font-medium"
+                  >
+                    ✕ 範囲指定解除
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStampMode(null);
+                      setTextMode(false);
+                      setShapeMode(null);
+                      setWhiteRectMode(false);
+                      setSnapshotMode(true);
+                    }}
+                    className="px-3 py-1.5 text-sm bg-cyan-50 hover:bg-cyan-100 text-cyan-700 rounded font-medium"
+                    title="ドラッグした範囲を画像化"
+                  >
+                    📸 スナップショット
+                  </button>
+                )}
+                <button
+                  type="button"
                   onClick={handleMerge}
                   className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded font-medium"
                   title="他の PDF を末尾に結合"
@@ -675,10 +741,12 @@ function App(): React.JSX.Element {
                   textMode={textMode}
                   shapeMode={shapeMode}
                   whiteRectMode={whiteRectMode}
+                  snapshotMode={snapshotMode}
                   onStampPlaced={handleStampPlaced}
                   onTextPlaced={handleTextPlaced}
                   onShapeDrawn={handleShapeDrawn}
                   onWhiteRectDrawn={handleWhiteRectDrawn}
+                  onSnapshot={handleSnapshot}
                   annotations={annotations}
                   onUpdateAnnotation={handleUpdateAnnotation}
                   onDeleteAnnotation={handleDeleteAnnotation}
@@ -736,6 +804,21 @@ function App(): React.JSX.Element {
             pdfBytes={pdfBytes}
             currentPage={currentPage}
             totalPages={totalPages}
+          />
+        )}
+        {pdfBytes && (
+          <CompressDialog
+            open={compressOpen}
+            onClose={() => setCompressOpen(false)}
+            pdfBytes={pdfBytes}
+            fileName={fileName}
+            onResult={(bytes, name) => {
+              pushHistory(pdfBytes);
+              setPdfBytes(bytes);
+              setFileName(name);
+              setIsDirty(true);
+              setAnnotations([]);
+            }}
           />
         )}
         <SignatureDialog

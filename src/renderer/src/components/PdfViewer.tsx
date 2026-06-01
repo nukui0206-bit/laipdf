@@ -17,6 +17,7 @@ interface PdfViewerProps {
   textMode: boolean;
   shapeMode: ShapeKind | null;
   whiteRectMode: boolean;
+  snapshotMode: boolean;
   onStampPlaced: (pageIndex: number, xPt: number, yPt: number, sizePt: number) => void;
   onTextPlaced: (pageIndex: number, xPt: number, yPt: number) => void;
   onShapeDrawn: (
@@ -33,6 +34,7 @@ interface PdfViewerProps {
     x2: number,
     y2: number,
   ) => void;
+  onSnapshot: (croppedCanvas: HTMLCanvasElement) => void;
   annotations: Annotation[];
   onUpdateAnnotation: (id: string, patch: Partial<Annotation>) => void;
   onDeleteAnnotation: (id: string) => void;
@@ -47,10 +49,12 @@ export function PdfViewer({
   textMode,
   shapeMode,
   whiteRectMode,
+  snapshotMode,
   onStampPlaced,
   onTextPlaced,
   onShapeDrawn,
   onWhiteRectDrawn,
+  onSnapshot,
   annotations,
   onUpdateAnnotation,
   onDeleteAnnotation,
@@ -121,7 +125,7 @@ export function PdfViewer({
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>): void => {
-    if (!shapeMode && !whiteRectMode) return;
+    if (!shapeMode && !whiteRectMode && !snapshotMode) return;
     const p = getPt(e);
     if (!p) return;
     setDrag({ x1: p.x, y1: p.y, x2: p.x, y2: p.y });
@@ -145,13 +149,25 @@ export function PdfViewer({
         onShapeDrawn(pageNum - 1, drag.x1, drag.y1, p.x, p.y);
       } else if (whiteRectMode) {
         onWhiteRectDrawn(pageNum - 1, drag.x1, drag.y1, p.x, p.y);
+      } else if (snapshotMode && canvasRef.current) {
+        // Canvas を切り取って渡す (pt → canvas px = pt * scale)
+        const sx = Math.min(drag.x1, p.x) * scale;
+        const sy = Math.min(drag.y1, p.y) * scale;
+        const sw = Math.abs(p.x - drag.x1) * scale;
+        const sh = Math.abs(p.y - drag.y1) * scale;
+        const crop = document.createElement('canvas');
+        crop.width = Math.max(1, Math.round(sw));
+        crop.height = Math.max(1, Math.round(sh));
+        const ctx = crop.getContext('2d')!;
+        ctx.drawImage(canvasRef.current, sx, sy, sw, sh, 0, 0, crop.width, crop.height);
+        onSnapshot(crop);
       }
     }
     setDrag(null);
   };
 
   const handleClick = (e: React.MouseEvent<HTMLCanvasElement>): void => {
-    if (shapeMode || whiteRectMode) return; // ドラッグモード中は click 無視
+    if (shapeMode || whiteRectMode || snapshotMode) return; // ドラッグモード中は click 無視
     if (!pagePtSize) return;
     const p = getPt(e);
     if (!p) return;
@@ -218,6 +234,13 @@ export function PdfViewer({
             </span>
           </div>
         )}
+        {snapshotMode && (
+          <div className="ml-4 px-3 py-1 bg-cyan-50 border border-cyan-400 rounded">
+            <span className="text-xs text-cyan-700">
+              📸 スナップショット — ドラッグした範囲を画像化（クリップボード + 保存可）
+            </span>
+          </div>
+        )}
 
         <div className="ml-auto flex items-center gap-1">
           <button
@@ -247,7 +270,7 @@ export function PdfViewer({
             onMouseUp={handleMouseUp}
             onMouseLeave={() => setDrag(null)}
             onClick={handleClick}
-            className={`shadow-xl bg-white ${stampMode || textMode || shapeMode || whiteRectMode ? 'cursor-crosshair' : ''}`}
+            className={`shadow-xl bg-white ${stampMode || textMode || shapeMode || whiteRectMode || snapshotMode ? 'cursor-crosshair' : ''}`}
           />
           {/* 注釈レイヤー (テキスト・印鑑をドラッグで移動) */}
           <AnnotationLayer
@@ -258,9 +281,15 @@ export function PdfViewer({
             onDelete={onDeleteAnnotation}
           />
           {/* ドラッグプレビュー */}
-          {drag && (shapeMode || whiteRectMode) && (
+          {drag && (shapeMode || whiteRectMode || snapshotMode) && (
             <div
-              className={`absolute pointer-events-none border-2 border-dashed ${whiteRectMode ? 'border-gray-600 bg-white/60' : 'border-red-500 bg-red-100/20'}`}
+              className={`absolute pointer-events-none border-2 border-dashed ${
+                whiteRectMode
+                  ? 'border-gray-600 bg-white/60'
+                  : snapshotMode
+                    ? 'border-cyan-600 bg-cyan-100/20'
+                    : 'border-red-500 bg-red-100/20'
+              }`}
               style={{
                 left: Math.min(drag.x1, drag.x2) * scale,
                 top: Math.min(drag.y1, drag.y2) * scale,

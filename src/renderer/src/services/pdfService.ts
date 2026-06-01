@@ -1,6 +1,64 @@
 import { PDFDocument, StandardFonts, degrees, rgb } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type { Annotation } from '../types/annotation';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+
+/**
+ * PDF 圧縮: 各ページを Canvas にレンダリング → JPEG → 新 PDF に貼り付け
+ * テキストレイヤーは失われる (検索不可になる) が、スキャン PDF などサイズ削減効果絶大
+ *
+ * @param dpi 解像度 (72=Web, 96=画面, 150=印刷)
+ * @param jpegQuality 0.0-1.0 (0.7 推奨)
+ * @param onProgress 進捗コールバック (0.0-1.0)
+ */
+export async function compressPdf(
+  bytes: Uint8Array,
+  dpi: number,
+  jpegQuality: number,
+  onProgress?: (p: number) => void,
+): Promise<Uint8Array> {
+  const buffer = bytes.slice().buffer;
+  const src = await pdfjsLib.getDocument({ data: buffer }).promise;
+  const newPdf = await PDFDocument.create();
+  const scale = dpi / 72; // PDF の標準は 72dpi
+
+  for (let i = 1; i <= src.numPages; i++) {
+    const page = await src.getPage(i);
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d')!;
+    // 白背景を塗ってから描画 (透過対策)
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    // Canvas → JPEG blob
+    const blob = await new Promise<Blob>((resolve) =>
+      canvas.toBlob((b) => resolve(b!), 'image/jpeg', jpegQuality),
+    );
+    const jpegBytes = new Uint8Array(await blob.arrayBuffer());
+    const img = await newPdf.embedJpg(jpegBytes);
+
+    // 元 PDF と同じ pt サイズで新 PDF にページ追加 (scale 1 = 72dpi pt)
+    const ptViewport = page.getViewport({ scale: 1 });
+    const newPage = newPdf.addPage([ptViewport.width, ptViewport.height]);
+    newPage.drawImage(img, {
+      x: 0,
+      y: 0,
+      width: ptViewport.width,
+      height: ptViewport.height,
+    });
+
+    onProgress?.(i / src.numPages);
+  }
+
+  return await newPdf.save();
+}
 
 // 日本語フォントは初回ロード時にキャッシュ
 let cachedJpFont: ArrayBuffer | null = null;
