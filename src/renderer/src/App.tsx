@@ -17,14 +17,14 @@ import {
   deletePage,
   rotatePage,
   reorderPages,
-  stampOnPage,
-  addText,
   mergePdfs,
   splitPdf,
   imagesToPdf,
   drawShape,
+  flattenAnnotations,
   type ShapeKind,
 } from './services/pdfService';
+import type { Annotation } from './types/annotation';
 
 function App(): React.JSX.Element {
   const [pdfBytes, setPdfBytes] = useState<Uint8Array | null>(null);
@@ -36,9 +36,11 @@ function App(): React.JSX.Element {
   const [stampMode, setStampMode] = useState<StampMeta | null>(null);
   const [textMode, setTextMode] = useState(false);
   const [shapeMode, setShapeMode] = useState<ShapeKind | null>(null);
+  const [whiteRectMode, setWhiteRectMode] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [signatureOpen, setSignatureOpen] = useState(false);
   const [ocrOpen, setOcrOpen] = useState(false);
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [shapeColor, setShapeColor] = useState<{ r: number; g: number; b: number; label: string }>({
     r: 0.85, g: 0.1, b: 0.1, label: '赤',
   });
@@ -120,6 +122,7 @@ function App(): React.JSX.Element {
     setCurrentPage(1);
     setIsDirty(false);
     setUndoStack([]);
+    setAnnotations([]);
   };
 
   const handleClose = (): void => {
@@ -131,6 +134,7 @@ function App(): React.JSX.Element {
     setIsDirty(false);
     setStampMode(null);
     setUndoStack([]);
+    setAnnotations([]);
   };
 
   const handleTotalPagesChange = useCallback((n: number) => setTotalPages(n), []);
@@ -191,57 +195,100 @@ function App(): React.JSX.Element {
     setPendingTextSpot({ pageIndex, xPt, yPt });
   };
 
-  const handleTextSubmit = async (
+  const handleTextSubmit = (
     text: string,
     fontSize: number,
     color: { r: number; g: number; b: number },
-  ): Promise<void> => {
+  ): void => {
     if (!pdfBytes || !pendingTextSpot) return;
-    try {
-      pushHistory(pdfBytes);
-      const updated = await addText(
-        pdfBytes,
-        pendingTextSpot.pageIndex,
-        text,
-        pendingTextSpot.xPt,
-        pendingTextSpot.yPt,
+    setAnnotations((prev) => [
+      ...prev,
+      {
+        id: `text-${Date.now()}-${Math.random()}`,
+        kind: 'text',
+        pageIndex: pendingTextSpot.pageIndex,
+        x: pendingTextSpot.xPt,
+        y: pendingTextSpot.yPt,
         fontSize,
+        text,
         color,
-      );
-      setPdfBytes(updated);
-      setIsDirty(true);
-      toast.success('テキストを追加しました');
-    } catch (err) {
-      console.error(err);
-      toast.error('テキスト追加に失敗しました');
-    } finally {
-      setPendingTextSpot(null);
-    }
+      },
+    ]);
+    setIsDirty(true);
+    toast.success('テキストを配置 (ドラッグで移動可)');
+    setPendingTextSpot(null);
   };
 
-  const handleStampPlaced = async (
+  const handleStampPlaced = (
     pageIndex: number,
     xPt: number,
     yPt: number,
     sizePt: number,
-  ): Promise<void> => {
+  ): void => {
     if (!pdfBytes || !stampMode) return;
-    try {
-      // dataURL → bytes
-      pushHistory(pdfBytes);
-      const base64 = stampMode.dataUrl.split(',')[1];
-      const bin = atob(base64);
-      const stampBytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) stampBytes[i] = bin.charCodeAt(i);
-
-      const updated = await stampOnPage(pdfBytes, pageIndex, stampBytes, xPt, yPt, sizePt);
-      setPdfBytes(updated);
+    const img = new Image();
+    img.onload = () => {
+      const aspect = img.height / img.width;
+      const w = sizePt;
+      const h = sizePt * aspect;
+      setAnnotations((prev) => [
+        ...prev,
+        {
+          id: `stamp-${Date.now()}-${Math.random()}`,
+          kind: 'stamp',
+          pageIndex,
+          x: xPt,
+          y: yPt,
+          width: w,
+          height: h,
+          dataUrl: stampMode.dataUrl,
+          name: stampMode.name,
+        },
+      ]);
       setIsDirty(true);
-      toast.success(`「${stampMode.name}」を押印しました`);
-    } catch (err) {
-      console.error(err);
-      toast.error('押印に失敗しました');
-    }
+      toast.success(`「${stampMode.name}」を配置 (ドラッグで移動可)`);
+    };
+    img.src = stampMode.dataUrl;
+  };
+
+  const handleUpdateAnnotation = (id: string, patch: Partial<Annotation>): void => {
+    setAnnotations((prev) =>
+      prev.map((a) => (a.id === id ? ({ ...a, ...patch } as Annotation) : a)),
+    );
+    setIsDirty(true);
+  };
+
+  const handleDeleteAnnotation = (id: string): void => {
+    setAnnotations((prev) => prev.filter((a) => a.id !== id));
+    setIsDirty(true);
+    toast.success('削除しました');
+  };
+
+  const handleWhiteRectDrawn = (
+    pageIndex: number,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+  ): void => {
+    const x = Math.min(x1, x2);
+    const y = Math.min(y1, y2);
+    const w = Math.abs(x2 - x1);
+    const h = Math.abs(y2 - y1);
+    setAnnotations((prev) => [
+      ...prev,
+      {
+        id: `wr-${Date.now()}-${Math.random()}`,
+        kind: 'white-rect',
+        pageIndex,
+        x,
+        y,
+        width: w,
+        height: h,
+      },
+    ]);
+    setIsDirty(true);
+    toast.success('白塗りを配置 (上からテキスト追加できます)');
   };
 
   const handleShapeDrawn = async (
@@ -333,10 +380,17 @@ function App(): React.JSX.Element {
   const handleSave = async (): Promise<void> => {
     if (!pdfBytes) return;
     try {
+      // 注釈レイヤーを焼き込み
+      const finalBytes =
+        annotations.length > 0
+          ? await flattenAnnotations(pdfBytes, annotations)
+          : pdfBytes;
       const suggested = fileName.replace(/\.pdf$/i, '_編集済み.pdf');
-      const result = await window.laipdf.file.savePdf(pdfBytes, suggested);
+      const result = await window.laipdf.file.savePdf(finalBytes, suggested);
       if (result.saved) {
         setIsDirty(false);
+        setAnnotations([]);
+        setPdfBytes(finalBytes);
         toast.success('保存しました');
       }
     } catch (err) {
@@ -444,11 +498,35 @@ function App(): React.JSX.Element {
                     onClick={() => {
                       setStampMode(null);
                       setShapeMode(null);
+                      setWhiteRectMode(false);
                       setTextMode(true);
                     }}
                     className="px-3 py-1.5 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 rounded font-medium"
                   >
                     ✏ テキスト追加
+                  </button>
+                )}
+                {whiteRectMode ? (
+                  <button
+                    type="button"
+                    onClick={() => setWhiteRectMode(false)}
+                    className="px-3 py-1.5 text-sm bg-gray-300 hover:bg-gray-400 text-gray-800 rounded font-medium"
+                  >
+                    ✕ 白塗り解除
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStampMode(null);
+                      setTextMode(false);
+                      setShapeMode(null);
+                      setWhiteRectMode(true);
+                    }}
+                    className="px-3 py-1.5 text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 rounded font-medium"
+                    title="既存文字を白く隠す（上からテキストで書き換え）"
+                  >
+                    ⌫ 白塗り編集
                   </button>
                 )}
                 {shapeMode ? (
@@ -502,6 +580,7 @@ function App(): React.JSX.Element {
                     onClick={() => {
                       setTextMode(false);
                       setShapeMode(null);
+                      setWhiteRectMode(false);
                       setStampModalOpen(true);
                     }}
                     className="px-3 py-1.5 text-sm bg-orange-50 hover:bg-orange-100 text-orange-700 rounded font-medium"
@@ -595,9 +674,14 @@ function App(): React.JSX.Element {
                   stampMode={stampMode}
                   textMode={textMode}
                   shapeMode={shapeMode}
+                  whiteRectMode={whiteRectMode}
                   onStampPlaced={handleStampPlaced}
                   onTextPlaced={handleTextPlaced}
                   onShapeDrawn={handleShapeDrawn}
+                  onWhiteRectDrawn={handleWhiteRectDrawn}
+                  annotations={annotations}
+                  onUpdateAnnotation={handleUpdateAnnotation}
+                  onDeleteAnnotation={handleDeleteAnnotation}
                 />
               </div>
             </div>

@@ -3,6 +3,8 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type { StampMeta } from '../../../preload';
 import type { ShapeKind } from '../services/pdfService';
+import type { Annotation } from '../types/annotation';
+import { AnnotationLayer } from './AnnotationLayer';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -14,6 +16,7 @@ interface PdfViewerProps {
   stampMode: StampMeta | null;
   textMode: boolean;
   shapeMode: ShapeKind | null;
+  whiteRectMode: boolean;
   onStampPlaced: (pageIndex: number, xPt: number, yPt: number, sizePt: number) => void;
   onTextPlaced: (pageIndex: number, xPt: number, yPt: number) => void;
   onShapeDrawn: (
@@ -23,6 +26,16 @@ interface PdfViewerProps {
     x2: number,
     y2: number,
   ) => void;
+  onWhiteRectDrawn: (
+    pageIndex: number,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+  ) => void;
+  annotations: Annotation[];
+  onUpdateAnnotation: (id: string, patch: Partial<Annotation>) => void;
+  onDeleteAnnotation: (id: string) => void;
 }
 
 export function PdfViewer({
@@ -33,9 +46,14 @@ export function PdfViewer({
   stampMode,
   textMode,
   shapeMode,
+  whiteRectMode,
   onStampPlaced,
   onTextPlaced,
   onShapeDrawn,
+  onWhiteRectDrawn,
+  annotations,
+  onUpdateAnnotation,
+  onDeleteAnnotation,
 }: PdfViewerProps): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [totalPages, setTotalPages] = useState(0);
@@ -103,7 +121,7 @@ export function PdfViewer({
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>): void => {
-    if (!shapeMode) return;
+    if (!shapeMode && !whiteRectMode) return;
     const p = getPt(e);
     if (!p) return;
     setDrag({ x1: p.x, y1: p.y, x2: p.x, y2: p.y });
@@ -117,19 +135,23 @@ export function PdfViewer({
   };
 
   const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>): void => {
-    if (!drag || !shapeMode) {
+    if (!drag) {
       setDrag(null);
       return;
     }
     const p = getPt(e);
     if (p && Math.hypot(p.x - drag.x1, p.y - drag.y1) > 4) {
-      onShapeDrawn(pageNum - 1, drag.x1, drag.y1, p.x, p.y);
+      if (shapeMode) {
+        onShapeDrawn(pageNum - 1, drag.x1, drag.y1, p.x, p.y);
+      } else if (whiteRectMode) {
+        onWhiteRectDrawn(pageNum - 1, drag.x1, drag.y1, p.x, p.y);
+      }
     }
     setDrag(null);
   };
 
   const handleClick = (e: React.MouseEvent<HTMLCanvasElement>): void => {
-    if (shapeMode) return; // 図形モード中は click 無視 (drag で処理)
+    if (shapeMode || whiteRectMode) return; // ドラッグモード中は click 無視
     if (!pagePtSize) return;
     const p = getPt(e);
     if (!p) return;
@@ -189,6 +211,13 @@ export function PdfViewer({
             </span>
           </div>
         )}
+        {whiteRectMode && (
+          <div className="ml-4 px-3 py-1 bg-gray-50 border border-gray-400 rounded">
+            <span className="text-xs text-gray-700">
+              ⌫ 白塗りモード — ドラッグした範囲を白く隠す（後でドラッグで移動・サイズ調整可）
+            </span>
+          </div>
+        )}
 
         <div className="ml-auto flex items-center gap-1">
           <button
@@ -218,12 +247,20 @@ export function PdfViewer({
             onMouseUp={handleMouseUp}
             onMouseLeave={() => setDrag(null)}
             onClick={handleClick}
-            className={`shadow-xl bg-white ${stampMode || textMode || shapeMode ? 'cursor-crosshair' : ''}`}
+            className={`shadow-xl bg-white ${stampMode || textMode || shapeMode || whiteRectMode ? 'cursor-crosshair' : ''}`}
+          />
+          {/* 注釈レイヤー (テキスト・印鑑をドラッグで移動) */}
+          <AnnotationLayer
+            annotations={annotations}
+            pageIndex={pageNum - 1}
+            scale={scale}
+            onUpdate={onUpdateAnnotation}
+            onDelete={onDeleteAnnotation}
           />
           {/* ドラッグプレビュー */}
-          {drag && shapeMode && (
+          {drag && (shapeMode || whiteRectMode) && (
             <div
-              className="absolute pointer-events-none border-2 border-dashed border-red-500 bg-red-100/20"
+              className={`absolute pointer-events-none border-2 border-dashed ${whiteRectMode ? 'border-gray-600 bg-white/60' : 'border-red-500 bg-red-100/20'}`}
               style={{
                 left: Math.min(drag.x1, drag.x2) * scale,
                 top: Math.min(drag.y1, drag.y2) * scale,

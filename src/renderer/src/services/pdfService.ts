@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, degrees, rgb } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
+import type { Annotation } from '../types/annotation';
 
 // 日本語フォントは初回ロード時にキャッシュ
 let cachedJpFont: ArrayBuffer | null = null;
@@ -64,6 +65,70 @@ export async function addText(
   return await pdf.save();
 }
 
+
+/**
+ * 注釈レイヤーをまとめて PDF に焼き込む（保存時に呼ぶ）
+ */
+export async function flattenAnnotations(
+  bytes: Uint8Array,
+  annotations: Annotation[],
+): Promise<Uint8Array> {
+  if (annotations.length === 0) return bytes;
+  const pdf = await PDFDocument.load(bytes);
+  pdf.registerFontkit(fontkit);
+
+  // 日本語フォントは必要時のみロード
+  let jpFont: Awaited<ReturnType<typeof pdf.embedFont>> | null = null;
+  let helveticaFont: Awaited<ReturnType<typeof pdf.embedFont>> | null = null;
+
+  for (const a of annotations) {
+    const page = pdf.getPage(a.pageIndex);
+    const { height: pageH } = page.getSize();
+    if (a.kind === 'text') {
+      const hasJp = /[　-鿿぀-ゟ゠-ヿ]/.test(a.text);
+      let font;
+      if (hasJp) {
+        if (!jpFont) {
+          const fontBytes = await loadJpFont();
+          jpFont = fontBytes
+            ? await pdf.embedFont(fontBytes, { subset: true })
+            : await pdf.embedFont(StandardFonts.Helvetica);
+        }
+        font = jpFont;
+      } else {
+        if (!helveticaFont) helveticaFont = await pdf.embedFont(StandardFonts.Helvetica);
+        font = helveticaFont;
+      }
+      const y = pageH - a.y - a.fontSize;
+      page.drawText(a.text, {
+        x: a.x,
+        y,
+        size: a.fontSize,
+        font,
+        color: rgb(a.color.r, a.color.g, a.color.b),
+      });
+    } else if (a.kind === 'stamp') {
+      const base64 = a.dataUrl.split(',')[1];
+      const bin = atob(base64);
+      const stampBytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) stampBytes[i] = bin.charCodeAt(i);
+      const png = await pdf.embedPng(stampBytes);
+      const y = pageH - a.y - a.height;
+      page.drawImage(png, { x: a.x, y, width: a.width, height: a.height });
+    } else if (a.kind === 'white-rect') {
+      const y = pageH - a.y - a.height;
+      page.drawRectangle({
+        x: a.x,
+        y,
+        width: a.width,
+        height: a.height,
+        color: rgb(1, 1, 1),
+        borderWidth: 0,
+      });
+    }
+  }
+  return await pdf.save();
+}
 
 export type ShapeKind = 'rect' | 'circle' | 'arrow' | 'highlight';
 
