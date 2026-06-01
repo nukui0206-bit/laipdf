@@ -138,7 +138,7 @@ const html = `<!doctype html>
     <div class="title">LaiPDF</div>
     <div class="subtitle">取扱説明書 / User Manual</div>
     <div class="meta">
-      Version 1.0.3<br>
+      Version 1.0.4<br>
       株式会社 L'aide<br>
       Laiweb 契約者向け配布版
     </div>

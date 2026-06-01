@@ -56,6 +56,38 @@ function App(): React.JSX.Element {
   const [undoStack, setUndoStack] = useState<Uint8Array[]>([]);
   const MAX_UNDO = 10;
 
+  // 現在アクティブなモード (どれか 1 つしか true にならない設計)
+  const activeMode: { key: string; label: string } | null = textMode
+    ? { key: 'text', label: 'テキスト追加' }
+    : stampMode
+      ? { key: 'stamp', label: stampMode.name.includes('署名') ? '署名配置' : '印鑑押印' }
+      : shapeMode
+        ? {
+            key: 'shape',
+            label:
+              shapeMode === 'rect'
+                ? '矩形'
+                : shapeMode === 'circle'
+                  ? '円'
+                  : shapeMode === 'arrow'
+                    ? '矢印'
+                    : 'マーカー',
+          }
+        : whiteRectMode
+          ? { key: 'white-rect', label: '白塗り編集' }
+          : snapshotMode
+            ? { key: 'snapshot', label: 'スナップショット' }
+            : null;
+
+  const exitAllModes = useCallback((): void => {
+    setStampMode(null);
+    setTextMode(false);
+    setShapeMode(null);
+    setWhiteRectMode(false);
+    setSnapshotMode(false);
+    setShapeMenuOpen(false);
+  }, []);
+
   // pdfBytes を更新する前に履歴に push (ファイル開いた時/閉じた時は履歴クリア)
   const pushHistory = useCallback((current: Uint8Array) => {
     setUndoStack((prev) => {
@@ -102,13 +134,34 @@ function App(): React.JSX.Element {
         e.preventDefault();
         void handlePrint();
       }
-      if (e.key === 'Escape' && searchOpen) {
-        setSearchOpen(false);
+      if (e.key === 'Escape') {
+        if (isInput) return;
+        if (searchOpen) {
+          setSearchOpen(false);
+          return;
+        }
+        // 編集モード中なら閲覧モードに戻す
+        if (textMode || stampMode || shapeMode || whiteRectMode || snapshotMode || shapeMenuOpen) {
+          e.preventDefault();
+          exitAllModes();
+          toast('閲覧モードに戻りました', { icon: '↖' });
+        }
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [handleUndo, pdfBytes, searchOpen]);
+  }, [
+    handleUndo,
+    pdfBytes,
+    searchOpen,
+    textMode,
+    stampMode,
+    shapeMode,
+    whiteRectMode,
+    snapshotMode,
+    shapeMenuOpen,
+    exitAllModes,
+  ]);
   const [pendingTextSpot, setPendingTextSpot] = useState<{
     pageIndex: number;
     xPt: number;
@@ -480,7 +533,7 @@ function App(): React.JSX.Element {
           <div className="flex items-center gap-2">
             <img src={logoUrl} alt="L'aide" className="w-7 h-7 object-contain" />
             <h1 className="text-base font-bold text-gray-800">LaiPDF</h1>
-            <span className="text-xs text-gray-400 ml-1">v0.1.0</span>
+            <span className="text-xs text-gray-400 ml-1">v1.0.4</span>
           </div>
 
           <div className="flex-1 flex items-center justify-center">
@@ -542,36 +595,60 @@ function App(): React.JSX.Element {
           </div>
         </header>
 
-        {/* モード時の色・線幅サブツールバー */}
-        {pdfBytes && ((shapeMode && shapeMode !== 'highlight') || textMode) && (
-          <div className="bg-white border-b border-gray-200 px-4 py-1.5 flex items-center gap-3 text-xs">
-            <span className="text-gray-500">色:</span>
-            {[
-              { r: 0.85, g: 0.10, b: 0.10, label: '赤' },
-              { r: 0.10, g: 0.30, b: 0.85, label: '青' },
-              { r: 0.10, g: 0.55, b: 0.20, label: '緑' },
-              { r: 0,    g: 0,    b: 0,    label: '黒' },
-            ].map((c) => (
-              <button
-                key={c.label}
-                type="button"
-                onClick={() => setShapeColor(c)}
-                className={`w-5 h-5 rounded-full border-2 ${shapeColor.label === c.label ? 'border-gray-800 scale-110' : 'border-gray-300'}`}
-                style={{ backgroundColor: `rgb(${c.r * 255},${c.g * 255},${c.b * 255})` }}
-                title={c.label}
-              />
-            ))}
-            <span className="ml-2 text-gray-500">線幅:</span>
-            {[1, 2, 4, 6].map((w) => (
-              <button
-                key={w}
-                type="button"
-                onClick={() => setLineWidth(w)}
-                className={`px-2 py-0.5 rounded ${lineWidth === w ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600'}`}
-              >
-                {w}pt
-              </button>
-            ))}
+        {/* モード中のステータスバー (現在のモード表示 + 終了ボタン + 色・線幅) */}
+        {pdfBytes && activeMode && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-1.5 flex items-center gap-3 text-xs">
+            <span className="font-semibold text-amber-800">
+              📝 {activeMode.label} モード中
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                exitAllModes();
+                toast('閲覧モードに戻りました', { icon: '↖' });
+              }}
+              className="px-2.5 py-0.5 bg-white border border-amber-300 text-amber-800 rounded hover:bg-amber-100"
+              title="Esc キーでも終了できます"
+            >
+              ✕ 終了 (Esc)
+            </button>
+
+            {/* 色・線幅サブツールバー (テキスト or 図形 [マーカー除く] のみ) */}
+            {((shapeMode && shapeMode !== 'highlight') || textMode) && (
+              <>
+                <span className="ml-2 text-gray-500">色:</span>
+                {[
+                  { r: 0.85, g: 0.10, b: 0.10, label: '赤' },
+                  { r: 0.10, g: 0.30, b: 0.85, label: '青' },
+                  { r: 0.10, g: 0.55, b: 0.20, label: '緑' },
+                  { r: 0,    g: 0,    b: 0,    label: '黒' },
+                ].map((c) => (
+                  <button
+                    key={c.label}
+                    type="button"
+                    onClick={() => setShapeColor(c)}
+                    className={`w-5 h-5 rounded-full border-2 ${shapeColor.label === c.label ? 'border-gray-800 scale-110' : 'border-gray-300'}`}
+                    style={{ backgroundColor: `rgb(${c.r * 255},${c.g * 255},${c.b * 255})` }}
+                    title={c.label}
+                  />
+                ))}
+                {shapeMode && (
+                  <>
+                    <span className="ml-2 text-gray-500">線幅:</span>
+                    {[1, 2, 4, 6].map((w) => (
+                      <button
+                        key={w}
+                        type="button"
+                        onClick={() => setLineWidth(w)}
+                        className={`px-2 py-0.5 rounded ${lineWidth === w ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600'}`}
+                      >
+                        {w}pt
+                      </button>
+                    ))}
+                  </>
+                )}
+              </>
+            )}
           </div>
         )}
 
@@ -584,6 +661,11 @@ function App(): React.JSX.Element {
                 shapeActive={shapeMode !== null}
                 whiteRectMode={whiteRectMode}
                 snapshotMode={snapshotMode}
+                anyModeActive={activeMode !== null}
+                onExitAllModes={() => {
+                  exitAllModes();
+                  toast('閲覧モードに戻りました', { icon: '↖' });
+                }}
                 onOpenStamps={() => {
                   setTextMode(false); setShapeMode(null); setWhiteRectMode(false); setSnapshotMode(false);
                   setStampModalOpen(true);
