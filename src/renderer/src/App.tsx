@@ -9,6 +9,7 @@ import { StampManager } from './components/StampManager';
 import { TextInputDialog } from './components/TextInputDialog';
 import { SplitDialog } from './components/SplitDialog';
 import { LicenseScreen } from './components/LicenseScreen';
+import { SearchPanel } from './components/SearchPanel';
 import type { StampMeta, LicenseInfo } from '../../preload';
 import {
   deletePage,
@@ -33,6 +34,7 @@ function App(): React.JSX.Element {
   const [stampMode, setStampMode] = useState<StampMeta | null>(null);
   const [textMode, setTextMode] = useState(false);
   const [shapeMode, setShapeMode] = useState<ShapeKind | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [shapeColor, setShapeColor] = useState<{ r: number; g: number; b: number; label: string }>({
     r: 0.85, g: 0.1, b: 0.1, label: '赤',
   });
@@ -60,20 +62,28 @@ function App(): React.JSX.Element {
     toast.success('1 操作を取り消しました');
   }, [undoStack]);
 
-  // Ctrl+Z キーバインド
+  // Ctrl+Z + Ctrl+F キーバインド
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
+      const tag = (document.activeElement?.tagName ?? '').toLowerCase();
+      const isInput = tag === 'input' || tag === 'textarea';
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
-        // input/textarea にフォーカスがある時はスキップ
-        const tag = (document.activeElement?.tagName ?? '').toLowerCase();
-        if (tag === 'input' || tag === 'textarea') return;
+        if (isInput) return;
         e.preventDefault();
         handleUndo();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        if (!pdfBytes) return;
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+      if (e.key === 'Escape' && searchOpen) {
+        setSearchOpen(false);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [handleUndo]);
+  }, [handleUndo, pdfBytes, searchOpen]);
   const [pendingTextSpot, setPendingTextSpot] = useState<{
     pageIndex: number;
     xPt: number;
@@ -497,6 +507,14 @@ function App(): React.JSX.Element {
                 )}
                 <button
                   type="button"
+                  onClick={() => setSearchOpen((v) => !v)}
+                  className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded font-medium"
+                  title="Ctrl+F でも開く"
+                >
+                  🔍 検索
+                </button>
+                <button
+                  type="button"
                   onClick={handleMerge}
                   className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded font-medium"
                   title="他の PDF を末尾に結合"
@@ -596,6 +614,14 @@ function App(): React.JSX.Element {
           totalPages={totalPages}
           onSubmit={handleSplit}
         />
+        {pdfBytes && (
+          <SearchPanel
+            open={searchOpen}
+            onClose={() => setSearchOpen(false)}
+            pdfBytes={pdfBytes}
+            onJump={(p) => setCurrentPage(p)}
+          />
+        )}
       </div>
     </DndProvider>
   );
