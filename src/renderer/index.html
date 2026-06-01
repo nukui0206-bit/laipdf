@@ -2,11 +2,21 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>Electron</title>
-    <!-- https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP -->
+    <title>LaiPDF</title>
+    <!--
+      Tesseract.js (OCR) と pdf-lib の動作に必要な許可:
+      - 'unsafe-eval' / blob: : WASM および Worker
+      - jsdelivr / unpkg / tessdata.projectnaptha.com : Tesseract 言語データと core
+    -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+      content="default-src 'self' data: blob:;
+               script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://unpkg.com;
+               style-src 'self' 'unsafe-inline';
+               img-src 'self' data: blob:;
+               connect-src 'self' data: blob: https://cdn.jsdelivr.net https://unpkg.com https://tessdata.projectnaptha.com https://*.tessdata.projectnaptha.com;
+               worker-src 'self' blob:;
+               font-src 'self' data:;"
     />
   </head>
 

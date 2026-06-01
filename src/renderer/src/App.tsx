@@ -11,6 +11,7 @@ import { SplitDialog } from './components/SplitDialog';
 import { LicenseScreen } from './components/LicenseScreen';
 import { SearchPanel } from './components/SearchPanel';
 import { SignatureDialog } from './components/SignatureDialog';
+import { OcrPanel } from './components/OcrPanel';
 import type { StampMeta, LicenseInfo } from '../../preload';
 import {
   deletePage,
@@ -37,6 +38,7 @@ function App(): React.JSX.Element {
   const [shapeMode, setShapeMode] = useState<ShapeKind | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [signatureOpen, setSignatureOpen] = useState(false);
+  const [ocrOpen, setOcrOpen] = useState(false);
   const [shapeColor, setShapeColor] = useState<{ r: number; g: number; b: number; label: string }>({
     r: 0.85, g: 0.1, b: 0.1, label: '赤',
   });
@@ -528,6 +530,14 @@ function App(): React.JSX.Element {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setOcrOpen(true)}
+                  className="px-3 py-1.5 text-sm bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded font-medium"
+                  title="スキャン PDF などから文字を読み取り"
+                >
+                  📖 OCR
+                </button>
+                <button
+                  type="button"
                   onClick={handleMerge}
                   className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded font-medium"
                   title="他の PDF を末尾に結合"
@@ -633,6 +643,15 @@ function App(): React.JSX.Element {
             onClose={() => setSearchOpen(false)}
             pdfBytes={pdfBytes}
             onJump={(p) => setCurrentPage(p)}
+          />
+        )}
+        {pdfBytes && (
+          <OcrPanel
+            open={ocrOpen}
+            onClose={() => setOcrOpen(false)}
+            pdfBytes={pdfBytes}
+            currentPage={currentPage}
+            totalPages={totalPages}
           />
         )}
         <SignatureDialog
