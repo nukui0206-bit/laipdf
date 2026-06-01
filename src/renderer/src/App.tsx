@@ -10,6 +10,7 @@ import { TextInputDialog } from './components/TextInputDialog';
 import { SplitDialog } from './components/SplitDialog';
 import { LicenseScreen } from './components/LicenseScreen';
 import { SearchPanel } from './components/SearchPanel';
+import { SignatureDialog } from './components/SignatureDialog';
 import type { StampMeta, LicenseInfo } from '../../preload';
 import {
   deletePage,
@@ -35,6 +36,7 @@ function App(): React.JSX.Element {
   const [textMode, setTextMode] = useState(false);
   const [shapeMode, setShapeMode] = useState<ShapeKind | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [signatureOpen, setSignatureOpen] = useState(false);
   const [shapeColor, setShapeColor] = useState<{ r: number; g: number; b: number; label: string }>({
     r: 0.85, g: 0.1, b: 0.1, label: '赤',
   });
@@ -507,6 +509,17 @@ function App(): React.JSX.Element {
                 )}
                 <button
                   type="button"
+                  onClick={() => {
+                    setTextMode(false);
+                    setShapeMode(null);
+                    setSignatureOpen(true);
+                  }}
+                  className="px-3 py-1.5 text-sm bg-purple-50 hover:bg-purple-100 text-purple-700 rounded font-medium"
+                >
+                  ✍ 手書き署名
+                </button>
+                <button
+                  type="button"
                   onClick={() => setSearchOpen((v) => !v)}
                   className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded font-medium"
                   title="Ctrl+F でも開く"
@@ -622,6 +635,21 @@ function App(): React.JSX.Element {
             onJump={(p) => setCurrentPage(p)}
           />
         )}
+        <SignatureDialog
+          open={signatureOpen}
+          onClose={() => setSignatureOpen(false)}
+          onSubmit={(dataUrl) => {
+            // 仮想スタンプとして押印モードに移行
+            setStampMode({
+              id: `sig-${Date.now()}`,
+              name: '手書き署名',
+              fileName: 'signature.png',
+              createdAt: Date.now(),
+              dataUrl,
+            });
+            toast.success('PDF をクリックして署名を配置してください');
+          }}
+        />
       </div>
     </DndProvider>
   );
