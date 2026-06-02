@@ -34,4 +34,5 @@ publish:
   provider: github
   owner: nukui0206-bit
   repo: laipdf
-  private: true
+  releaseType: release
+  vPrefixedTagName: true

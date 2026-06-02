@@ -5,6 +5,13 @@ out
 .eslintcache
 *.log*
 
+# 環境変数 / 秘密情報 (絶対コミットしない)
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
 # Generated manual PDF (re-build via `npm run manual`)
 docs/*.pdf
 docs/_*.html

@@ -7,6 +7,7 @@ import { hostname, userInfo, platform, release } from 'os'
 import axios from 'axios'
 import Store from 'electron-store'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
 
 interface LicenseInfo {
@@ -80,6 +81,47 @@ interface StampMeta {
   createdAt: number
 }
 
+/**
+ * 自動更新セットアップ。
+ * GitHub Releases の latest.yml を見て新バージョンを検知 → 自動 DL → 次回起動時に適用。
+ * 失敗してもアプリ動作には影響しない (silent fail)。
+ */
+function setupAutoUpdater(win: BrowserWindow): void {
+  if (is.dev) return  // 開発時はスキップ
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+
+  autoUpdater.on('update-available', (info) => {
+    win.webContents.send('updater:status', { type: 'available', version: info.version })
+  })
+  autoUpdater.on('update-downloaded', async (info) => {
+    win.webContents.send('updater:status', { type: 'downloaded', version: info.version })
+    // ユーザーに通知 → 再起動するか確認
+    const result = await dialog.showMessageBox(win, {
+      type: 'info',
+      buttons: ['今すぐ再起動して更新', '後で (次回起動時に自動更新)'],
+      defaultId: 0,
+      cancelId: 1,
+      title: 'LaiPDF アップデート',
+      message: `新しいバージョン (${info.version}) が利用可能です`,
+      detail: '今すぐ再起動して更新を適用しますか？\n「後で」を選んでも、次回起動時に自動で更新されます。',
+    })
+    if (result.response === 0) {
+      autoUpdater.quitAndInstall()
+    }
+  })
+  autoUpdater.on('error', (err) => {
+    console.error('[autoUpdater]', err)
+  })
+
+  // 起動 5 秒後にチェック開始 (UI 表示を妨げない)
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch((err) => {
+      console.warn('[autoUpdater] check failed:', err?.message)
+    })
+  }, 5000)
+}
+
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
     width: 1280,
@@ -98,6 +140,7 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
+    setupAutoUpdater(mainWindow)
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {

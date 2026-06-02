@@ -533,7 +533,7 @@ function App(): React.JSX.Element {
           <div className="flex items-center gap-2">
             <img src={logoUrl} alt="L'aide" className="w-7 h-7 object-contain" />
             <h1 className="text-base font-bold text-gray-800">LaiPDF</h1>
-            <span className="text-xs text-gray-400 ml-1">v1.0.6</span>
+            <span className="text-xs text-gray-400 ml-1">v1.0.7</span>
           </div>
 
           <div className="flex-1 flex items-center justify-center">
