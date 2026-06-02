@@ -82,6 +82,65 @@ interface StampMeta {
 }
 
 /**
+ * ライセンスの定期再検証。
+ * 起動 10 秒後 + 24 時間ごとに、サーバーへ verify を打って状態を確認する。
+ * - サーバーが revoked/expired/key_not_found を返したら、ローカルから無効化 + renderer に通知
+ * - ネットワーク不通の場合は次回まで待つ (オフライン猶予を尊重)
+ */
+async function revalidateLicenseOnce(win: BrowserWindow): Promise<void> {
+  const lic = licenseStore.get('license') as LicenseInfo | undefined
+  if (!lic) return
+  if (lic.isTrialMode) return  // 体験版はローカル完結なので skip
+  if (!lic.email || !lic.key) return
+
+  try {
+    const res = await axios.post(
+      `${LICENSE_API_BASE}/verify`,
+      {
+        license_key: lic.key,
+        email: lic.email,
+        device_id: getOrCreateDeviceId(),
+        machine_name: hostname(),
+        os: `${platform()} ${release()}`,
+        app_version: app.getVersion(),
+      },
+      { timeout: 15000 },
+    )
+
+    if (res.data?.valid === true) {
+      // 成功: lastVerifiedAt を更新
+      lic.lastVerifiedAt = Date.now()
+      if (res.data.expires_at) lic.expiresAt = new Date(res.data.expires_at).getTime()
+      licenseStore.set('license', lic)
+      return
+    }
+
+    // valid=false → サーバ側で無効化されている
+    const reason = res.data?.reason ?? 'unknown'
+    const message = res.data?.message ?? reasonToMessage(reason)
+    console.warn('[revalidate] license invalidated:', reason, message)
+    licenseStore.delete('license')
+    win.webContents.send('license:invalidated', { reason, message })
+  } catch (err) {
+    // ネットワーク不通は何もしない (オフライン猶予)
+    const e = err as { code?: string }
+    if (['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNABORTED'].includes(e.code ?? '')) {
+      console.log('[revalidate] offline, skip')
+      return
+    }
+    console.warn('[revalidate] error:', err)
+  }
+}
+
+function setupLicenseRevalidation(win: BrowserWindow): void {
+  if (is.dev) return  // 開発時はスキップ
+  // 起動 10 秒後に 1 回
+  setTimeout(() => { void revalidateLicenseOnce(win) }, 10000)
+  // 以降は 24 時間ごと (アプリを開きっぱなしの場合用)
+  setInterval(() => { void revalidateLicenseOnce(win) }, 24 * 60 * 60 * 1000)
+}
+
+/**
  * 自動更新セットアップ。
  * GitHub Releases の latest.yml を見て新バージョンを検知 → 自動 DL → 次回起動時に適用。
  * 失敗してもアプリ動作には影響しない (silent fail)。
@@ -141,6 +200,7 @@ function createWindow(): void {
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
     setupAutoUpdater(mainWindow)
+    setupLicenseRevalidation(mainWindow)
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {

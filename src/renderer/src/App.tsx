@@ -187,6 +187,15 @@ function App(): React.JSX.Element {
     })();
   }, []);
 
+  // サーバー側でライセンスが無効化された場合の通知 (revoke / expired 等)
+  useEffect(() => {
+    const off = window.laipdf.license.onInvalidated((info) => {
+      toast.error(`ライセンスが無効になりました: ${info.message}`, { duration: 8000 });
+      setLicense(null);  // 認証画面に戻す
+    });
+    return off;
+  }, []);
+
   const handleFile = async (file: File): Promise<void> => {
     const buffer = await file.arrayBuffer();
     setPdfBytes(new Uint8Array(buffer));
@@ -533,7 +542,7 @@ function App(): React.JSX.Element {
           <div className="flex items-center gap-2">
             <img src={logoUrl} alt="L'aide" className="w-7 h-7 object-contain" />
             <h1 className="text-base font-bold text-gray-800">LaiPDF</h1>
-            <span className="text-xs text-gray-400 ml-1">v1.0.8</span>
+            <span className="text-xs text-gray-400 ml-1">v1.0.9</span>
           </div>
 
           <div className="flex-1 flex items-center justify-center">

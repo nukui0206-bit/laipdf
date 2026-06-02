@@ -68,7 +68,13 @@ const laipdf = {
       ipcRenderer.invoke('license:verify', email, key),
     startTrial: (): Promise<{ ok: boolean; license: LicenseInfo }> =>
       ipcRenderer.invoke('license:start-trial'),
-    deactivate: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('license:deactivate')
+    deactivate: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('license:deactivate'),
+    // サーバー側でライセンスが無効化された場合、main から通知される
+    onInvalidated: (cb: (info: { reason: string; message: string }) => void): (() => void) => {
+      const listener = (_e: unknown, info: { reason: string; message: string }): void => cb(info)
+      ipcRenderer.on('license:invalidated', listener)
+      return () => ipcRenderer.removeListener('license:invalidated', listener)
+    },
   },
   stamps: {
     list: (): Promise<StampMeta[]> => ipcRenderer.invoke('stamps:list'),
