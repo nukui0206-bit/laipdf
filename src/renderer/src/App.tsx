@@ -323,18 +323,18 @@ function App(): React.JSX.Element {
     img.src = stampMode.dataUrl;
   };
 
-  const handleUpdateAnnotation = (id: string, patch: Partial<Annotation>): void => {
+  const handleUpdateAnnotation = useCallback((id: string, patch: Partial<Annotation>): void => {
     setAnnotations((prev) =>
       prev.map((a) => (a.id === id ? ({ ...a, ...patch } as Annotation) : a)),
     );
-    setIsDirty(true);
-  };
+    setIsDirty((d) => (d ? d : true));
+  }, []);
 
-  const handleDeleteAnnotation = (id: string): void => {
+  const handleDeleteAnnotation = useCallback((id: string): void => {
     setAnnotations((prev) => prev.filter((a) => a.id !== id));
-    setIsDirty(true);
+    setIsDirty((d) => (d ? d : true));
     toast.success('削除しました');
-  };
+  }, []);
 
   const handleSnapshot = (croppedCanvas: HTMLCanvasElement): void => {
     croppedCanvas.toBlob(async (blob) => {
@@ -533,7 +533,7 @@ function App(): React.JSX.Element {
           <div className="flex items-center gap-2">
             <img src={logoUrl} alt="L'aide" className="w-7 h-7 object-contain" />
             <h1 className="text-base font-bold text-gray-800">LaiPDF</h1>
-            <span className="text-xs text-gray-400 ml-1">v1.0.4</span>
+            <span className="text-xs text-gray-400 ml-1">v1.0.6</span>
           </div>
 
           <div className="flex-1 flex items-center justify-center">

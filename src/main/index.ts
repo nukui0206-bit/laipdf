@@ -2,7 +2,9 @@ import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { writeFile, readFile, readdir, mkdir, unlink } from 'fs/promises'
 import { existsSync } from 'fs'
-import { randomUUID } from 'crypto'
+import { randomUUID, createHash } from 'crypto'
+import { hostname, userInfo, platform, release } from 'os'
+import axios from 'axios'
 import Store from 'electron-store'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -13,12 +15,44 @@ interface LicenseInfo {
   activatedAt: number
   expiresAt: number | null
   isTrialMode: boolean
+  lastVerifiedAt?: number  // 最後にサーバー検証した日時
+  planType?: string         // monthly / yearly / lifetime / trial
+  maxDevices?: number
 }
 
-const licenseStore = new Store<{ license?: LicenseInfo }>({
+const licenseStore = new Store<{ license?: LicenseInfo; deviceId?: string }>({
   name: 'license',
   defaults: {}
 })
+
+// ライセンス API 基底 URL (hub.salestree.online)
+const LICENSE_API_BASE = 'https://hub.salestree.online/api/licenses'
+// オフライン猶予期間 (これを超えて非接続だと再認証要求)
+const OFFLINE_GRACE_MS = 7 * 24 * 60 * 60 * 1000  // 7 日
+
+/** デバイス ID を生成 (ホスト名 + ユーザー名のハッシュ、永続化) */
+function getOrCreateDeviceId(): string {
+  let id = licenseStore.get('deviceId') as string | undefined
+  if (id) return id
+  const seed = `${hostname()}::${userInfo().username}::${randomUUID()}`
+  id = createHash('sha256').update(seed).digest('hex').substring(0, 32)
+  licenseStore.set('deviceId', id)
+  return id
+}
+
+/** サーバから返る reason を日本語メッセージに */
+function reasonToMessage(reason: string): string {
+  switch (reason) {
+    case 'key_not_found':       return 'ライセンスキーが見つかりません'
+    case 'email_mismatch':      return '登録メールアドレスと一致しません'
+    case 'revoked':             return 'このライセンスは無効化されています'
+    case 'suspended':           return 'このライセンスは一時停止されています'
+    case 'expired':             return 'ライセンスの有効期限が切れています'
+    case 'device_limit_exceeded': return '利用可能な端末数の上限に達しました。サポートにご連絡ください'
+    case 'not_found':           return 'ライセンスが見つかりません'
+    default:                    return '認証できませんでした (' + reason + ')'
+  }
+}
 
 const STAMPS_DIR = join(app.getPath('userData'), 'stamps')
 const FONTS_DIR = join(app.getPath('userData'), 'fonts')
@@ -114,6 +148,14 @@ app.whenReady().then(() => {
       if (lic.expiresAt && Date.now() > lic.expiresAt) {
         return { activated: false, license: lic }
       }
+      // オフライン猶予期間チェック (体験版はチェック不要)
+      if (!lic.isTrialMode && lic.lastVerifiedAt) {
+        const since = Date.now() - lic.lastVerifiedAt
+        if (since > OFFLINE_GRACE_MS) {
+          // 猶予期間を超えたが、まだ活性扱い。次回 verify 時に再確認させる
+          // ここでは活性のまま返す (Renderer 側で再認証 UI を出すかは将来の改善)
+        }
+      }
       return { activated: true, license: lic }
     }
   )
@@ -125,32 +167,64 @@ app.whenReady().then(() => {
       email: string,
       key: string
     ): Promise<{ ok: boolean; message: string; license?: LicenseInfo }> => {
-      // モック実装: 後で hub.salestree.online API に差し替え
-      // 有効パターン:
-      //   - メアドに @laiweb.jp / @laide / @salestree が含まれる
-      //   - キーが "LAIPDF-" で始まる任意の文字列
-      //   - またはマスター: "MASTER-DEBUG-KEY"
       const e = email.trim().toLowerCase()
       const k = key.trim().toUpperCase()
-      const validEmail =
-        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) &&
-        (e.includes('@laiweb') || e.includes('@laide') || e.includes('@salestree') ||
-          k === 'MASTER-DEBUG-KEY' || k.startsWith('LAIPDF-'))
-      if (!validEmail) {
-        return {
-          ok: false,
-          message: 'メアドまたはライセンスキーが無効です。Laiweb 契約者向けキーをご確認ください。'
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+        return { ok: false, message: 'メールアドレスの形式が不正です' }
+      }
+      if (!k) {
+        return { ok: false, message: 'ライセンスキーを入力してください' }
+      }
+
+      const deviceId = getOrCreateDeviceId()
+      try {
+        const res = await axios.post(
+          `${LICENSE_API_BASE}/verify`,
+          {
+            license_key: k,
+            email: e,
+            device_id: deviceId,
+            machine_name: hostname(),
+            os: `${platform()} ${release()}`,
+            app_version: app.getVersion(),
+          },
+          { timeout: 15000 },
+        )
+
+        if (res.data?.valid === true) {
+          const lic: LicenseInfo = {
+            email: res.data.email ?? e,
+            key: res.data.license_key ?? k,
+            activatedAt: Date.now(),
+            expiresAt: res.data.expires_at ? new Date(res.data.expires_at).getTime() : null,
+            isTrialMode: res.data.plan_type === 'trial',
+            lastVerifiedAt: Date.now(),
+            planType: res.data.plan_type,
+            maxDevices: res.data.max_devices,
+          }
+          licenseStore.set('license', lic)
+          return { ok: true, message: '認証に成功しました', license: lic }
         }
+
+        // valid=false の場合: サーバが詳細メッセージを返す
+        const reason = res.data?.reason ?? 'unknown'
+        const message = res.data?.message ?? reasonToMessage(reason)
+        return { ok: false, message }
+      } catch (err) {
+        const e = err as { code?: string; message?: string; response?: { data?: { message?: string } } }
+        // ネットワーク不通
+        if (e.code === 'ECONNREFUSED' || e.code === 'ETIMEDOUT' || e.code === 'ENOTFOUND' || e.code === 'ECONNABORTED') {
+          return {
+            ok: false,
+            message: 'サーバーに接続できませんでした。インターネット接続をご確認ください。',
+          }
+        }
+        // バリデーションエラー (422)
+        if (e.response?.data?.message) {
+          return { ok: false, message: e.response.data.message }
+        }
+        return { ok: false, message: 'ライセンス認証に失敗しました: ' + (e.message ?? '不明なエラー') }
       }
-      const lic: LicenseInfo = {
-        email: e,
-        key: k,
-        activatedAt: Date.now(),
-        expiresAt: null, // 永久
-        isTrialMode: false
-      }
-      licenseStore.set('license', lic)
-      return { ok: true, message: '認証成功', license: lic }
     }
   )
 
@@ -160,13 +234,29 @@ app.whenReady().then(() => {
       key: 'TRIAL',
       activatedAt: Date.now(),
       expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 日後
-      isTrialMode: true
+      isTrialMode: true,
+      lastVerifiedAt: Date.now(),
+      planType: 'trial',
     }
     licenseStore.set('license', lic)
     return { ok: true, license: lic }
   })
 
-  ipcMain.handle('license:deactivate', (): { ok: boolean } => {
+  ipcMain.handle('license:deactivate', async (): Promise<{ ok: boolean }> => {
+    const lic = licenseStore.get('license')
+    const deviceId = licenseStore.get('deviceId') as string | undefined
+    // サーバー側のアクティベーションも削除 (失敗してもローカルは消す)
+    if (lic && !lic.isTrialMode && deviceId) {
+      try {
+        await axios.post(
+          `${LICENSE_API_BASE}/deactivate`,
+          { license_key: lic.key, email: lic.email, device_id: deviceId },
+          { timeout: 10000 },
+        )
+      } catch {
+        // ネットワーク不通でもローカル無効化は実行
+      }
+    }
     licenseStore.delete('license')
     return { ok: true }
   })

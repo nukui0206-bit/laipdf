@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Annotation } from '../types/annotation';
 
 interface AnnotationLayerProps {
@@ -20,6 +20,14 @@ type DragState = {
   startH: number;
 };
 
+type DragLocal = {
+  id: string;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+};
+
 export function AnnotationLayer({
   annotations,
   pageIndex,
@@ -28,38 +36,98 @@ export function AnnotationLayer({
   onDelete,
 }: AnnotationLayerProps): React.JSX.Element {
   const [drag, setDrag] = useState<DragState | null>(null);
+  // ドラッグ中の位置をローカル state で持つ → 親の再レンダーを抑制
+  const [dragLocal, setDragLocal] = useState<DragLocal | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const layerRef = useRef<HTMLDivElement>(null);
+  const rafIdRef = useRef<number | null>(null);
+  const pendingMouseEvent = useRef<{ clientX: number; clientY: number } | null>(null);
 
   // 現在ページの注釈だけ
   const pageAnnotations = annotations.filter((a) => a.pageIndex === pageIndex);
 
-  const onMouseMove = (e: React.MouseEvent): void => {
+  // ドラッグ中の位置で表示するためのオーバーレイ取得
+  const getDisplayPos = (
+    a: Annotation,
+  ): { x: number; y: number; width?: number; height?: number } => {
+    if (dragLocal?.id === a.id) {
+      return {
+        x: dragLocal.x,
+        y: dragLocal.y,
+        width: dragLocal.width,
+        height: dragLocal.height,
+      };
+    }
+    return { x: a.x, y: a.y };
+  };
+
+  // RAF throttle: mousemove はフレームレートに合わせて間引く
+  const applyDrag = (clientX: number, clientY: number): void => {
     if (!drag) return;
-    e.preventDefault();
-    const dxPt = (e.clientX - drag.startMouseX) / scale;
-    const dyPt = (e.clientY - drag.startMouseY) / scale;
+    const dxPt = (clientX - drag.startMouseX) / scale;
+    const dyPt = (clientY - drag.startMouseY) / scale;
 
     if (drag.mode === 'move') {
-      onUpdate(drag.id, { x: drag.startX + dxPt, y: drag.startY + dyPt });
+      setDragLocal({ id: drag.id, x: drag.startX + dxPt, y: drag.startY + dyPt });
     } else {
       const target = annotations.find((a) => a.id === drag.id);
       const newW = Math.max(20, drag.startW + dxPt);
       if (target?.kind === 'stamp') {
-        // 等比リサイズ
         const ratio = drag.startW > 0 ? drag.startH / drag.startW : 1;
-        onUpdate(drag.id, { width: newW, height: newW * ratio } as Partial<Annotation>);
+        setDragLocal({
+          id: drag.id,
+          x: drag.startX,
+          y: drag.startY,
+          width: newW,
+          height: newW * ratio,
+        });
       } else {
-        // 独立リサイズ (white-rect)
         const newH = Math.max(10, drag.startH + dyPt);
-        onUpdate(drag.id, { width: newW, height: newH } as Partial<Annotation>);
+        setDragLocal({
+          id: drag.id,
+          x: drag.startX,
+          y: drag.startY,
+          width: newW,
+          height: newH,
+        });
       }
     }
   };
 
-  const onMouseUp = (): void => {
-    if (drag) setDrag(null);
+  const onMouseMove = (e: React.MouseEvent): void => {
+    if (!drag) return;
+    e.preventDefault();
+    pendingMouseEvent.current = { clientX: e.clientX, clientY: e.clientY };
+    if (rafIdRef.current === null) {
+      rafIdRef.current = requestAnimationFrame(() => {
+        rafIdRef.current = null;
+        const ev = pendingMouseEvent.current;
+        if (ev) applyDrag(ev.clientX, ev.clientY);
+      });
+    }
   };
+
+  const onMouseUp = (): void => {
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+    if (drag && dragLocal) {
+      // ドロップ時に 1 回だけ親へ通知
+      const patch: Partial<Annotation> = { x: dragLocal.x, y: dragLocal.y } as Partial<Annotation>;
+      if (dragLocal.width !== undefined) (patch as { width: number }).width = dragLocal.width;
+      if (dragLocal.height !== undefined) (patch as { height: number }).height = dragLocal.height;
+      onUpdate(drag.id, patch);
+    }
+    setDrag(null);
+    setDragLocal(null);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
+    };
+  }, []);
 
   return (
     <div
@@ -71,8 +139,9 @@ export function AnnotationLayer({
       onMouseLeave={onMouseUp}
     >
       {pageAnnotations.map((a) => {
-        const left = a.x * scale;
-        const top = a.y * scale;
+        const disp = getDisplayPos(a);
+        const left = disp.x * scale;
+        const top = disp.y * scale;
         const isSelected = selectedId === a.id;
 
         if (a.kind === 'text') {
@@ -129,8 +198,11 @@ export function AnnotationLayer({
         }
 
         if (a.kind === 'shape') {
-          const minX = Math.min(a.x, a.x + a.width);
-          const minY = Math.min(a.y, a.y + a.height);
+          // ドラッグ中は dragLocal の (x, y) を採用 (shape は move のみ)
+          const ax = disp.x;
+          const ay = disp.y;
+          const minX = Math.min(ax, ax + a.width);
+          const minY = Math.min(ay, ay + a.height);
           const absW = Math.abs(a.width);
           const absH = Math.abs(a.height);
           const colorCss = `rgb(${a.color.r * 255}, ${a.color.g * 255}, ${a.color.b * 255})`;
@@ -190,8 +262,8 @@ export function AnnotationLayer({
                 <svg
                   className="absolute pointer-events-none"
                   style={{
-                    left: a.x * scale - boxLeft,
-                    top: a.y * scale - boxTop,
+                    left: ax * scale - boxLeft,
+                    top: ay * scale - boxTop,
                     width: a.width * scale,
                     height: a.height * scale,
                     overflow: 'visible',
@@ -242,6 +314,8 @@ export function AnnotationLayer({
         }
 
         if (a.kind === 'white-rect') {
+          const w = disp.width ?? a.width;
+          const h = disp.height ?? a.height;
           return (
             <div
               key={a.id}
@@ -249,8 +323,8 @@ export function AnnotationLayer({
               style={{
                 left,
                 top,
-                width: a.width * scale,
-                height: a.height * scale,
+                width: w * scale,
+                height: h * scale,
                 pointerEvents: 'auto',
                 cursor: 'move',
                 background: 'white',
@@ -310,6 +384,8 @@ export function AnnotationLayer({
         }
 
         // stamp
+        const sw = disp.width ?? a.width;
+        const sh = disp.height ?? a.height;
         return (
           <div
             key={a.id}
@@ -317,8 +393,8 @@ export function AnnotationLayer({
             style={{
               left,
               top,
-              width: a.width * scale,
-              height: a.height * scale,
+              width: sw * scale,
+              height: sh * scale,
               pointerEvents: 'auto',
               cursor: 'move',
             }}
