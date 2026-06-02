@@ -13,6 +13,9 @@ files:
   - '!{tailwind.config.js,postcss.config.js}'
 asarUnpack:
   - resources/**
+extraResources:
+  - from: docs/LaiPDF-manual.pdf
+    to: manual.pdf
 win:
   executableName: LaiPDF
   target:

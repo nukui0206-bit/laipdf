@@ -55,6 +55,9 @@ const laipdf = {
   fonts: {
     getJp: (): Promise<Uint8Array | null> => ipcRenderer.invoke('fonts:get-jp')
   },
+  manual: {
+    open: (): Promise<Uint8Array | null> => ipcRenderer.invoke('manual:open')
+  },
   license: {
     status: (): Promise<{ activated: boolean; license: LicenseInfo | null }> =>
       ipcRenderer.invoke('license:status'),

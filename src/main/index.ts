@@ -304,6 +304,25 @@ app.whenReady().then(() => {
     return { ok: true }
   })
 
+  // ===== Manual IPC =====
+  // アプリ同梱の取扱説明書 PDF を読み込む (resources/manual.pdf)
+  ipcMain.handle('manual:open', async (): Promise<Uint8Array | null> => {
+    try {
+      const manualPath = app.isPackaged
+        ? join(process.resourcesPath, 'manual.pdf')
+        : join(__dirname, '../../docs/LaiPDF-manual.pdf')
+      if (!existsSync(manualPath)) {
+        console.error('[manual:open] file not found:', manualPath)
+        return null
+      }
+      const buf = await readFile(manualPath)
+      return new Uint8Array(buf)
+    } catch (err) {
+      console.error('[manual:open]', err)
+      return null
+    }
+  })
+
   // ===== Fonts IPC =====
   ipcMain.handle('fonts:get-jp', async (): Promise<Uint8Array | null> => {
     try {

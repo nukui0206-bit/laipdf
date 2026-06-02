@@ -15,7 +15,7 @@ import { OcrPanel } from './components/OcrPanel';
 import { CompressDialog } from './components/CompressDialog';
 import { ToolSidebar } from './components/ToolSidebar';
 import { PrintDialog } from './components/PrintDialog';
-import { Undo2, Save, X as XIcon, FileText, Settings, Printer } from 'lucide-react';
+import { Undo2, Save, X as XIcon, FileText, Settings, Printer, HelpCircle } from 'lucide-react';
 // resources/logo.png を src/renderer/src/assets/ にコピー済みのものを参照
 import logoUrl from './assets/logo.png';
 import type { StampMeta, LicenseInfo } from '../../preload';
@@ -533,7 +533,7 @@ function App(): React.JSX.Element {
           <div className="flex items-center gap-2">
             <img src={logoUrl} alt="L'aide" className="w-7 h-7 object-contain" />
             <h1 className="text-base font-bold text-gray-800">LaiPDF</h1>
-            <span className="text-xs text-gray-400 ml-1">v1.0.7</span>
+            <span className="text-xs text-gray-400 ml-1">v1.0.8</span>
           </div>
 
           <div className="flex-1 flex items-center justify-center">
@@ -584,6 +584,34 @@ function App(): React.JSX.Element {
                 </button>
               </>
             )}
+            <button
+              type="button"
+              onClick={async () => {
+                if (isDirty && !confirm('変更が保存されていません。\n取扱説明書を開きますか？\n（編集中の内容は失われます）')) return;
+                try {
+                  const bytes = await window.laipdf.manual.open();
+                  if (!bytes) {
+                    toast.error('取扱説明書を開けませんでした');
+                    return;
+                  }
+                  setPdfBytes(bytes);
+                  setFileName('LaiPDF 取扱説明書.pdf');
+                  setCurrentPage(1);
+                  setIsDirty(false);
+                  setUndoStack([]);
+                  setAnnotations([]);
+                  exitAllModes();
+                  toast.success('取扱説明書を開きました');
+                } catch (err) {
+                  console.error(err);
+                  toast.error('取扱説明書を開けませんでした');
+                }
+              }}
+              className="p-1.5 rounded hover:bg-gray-100 text-gray-500"
+              title="取扱説明書 (ヘルプ)"
+            >
+              <HelpCircle size={18} strokeWidth={1.75} />
+            </button>
             <button
               type="button"
               onClick={() => setStampModalOpen(true)}
