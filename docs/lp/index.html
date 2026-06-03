@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LaiPDF ─ PDF作業を、もっとシンプルに。 | 中小企業向け Windows PDF 編集ソフト</title>
+    <meta name="description" content="LaiPDF は中小企業の日常業務に必要な PDF 編集機能を 1 本に集約した Windows 用ソフトウェア。月 1,500 円から。30 日間無料体験あり。Adobe Acrobat より軽く、シンプル。">
+    <meta property="og:title" content="LaiPDF ─ PDF作業を、もっとシンプルに。">
+    <meta property="og:description" content="中小企業向け Windows PDF 編集ソフト。月 1,500 円から。30 日無料体験。">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://laide.co.jp/laipdf/">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', '"Hiragino Sans"', 'sans-serif'],
+                        display: ['"Plus Jakarta Sans"', '"Noto Sans JP"', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50:  '#f0f5ff',
+                            100: '#e0eaff',
+                            500: '#3b62d6',
+                            600: '#2b4dc4',
+                            700: '#1e3a9c',
+                            800: '#162b73',
+                            900: '#0f1f54',
+                        },
+                    },
+                },
+            },
+        };
+    </script>
+    <style>
+        body { font-family: 'Noto Sans JP', sans-serif; color: #1f2937; }
+        .gradient-text { background: linear-gradient(135deg, #1e3a9c 0%, #3b62d6 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+        .card-hover { transition: transform 0.2s, box-shadow 0.2s; }
+        .card-hover:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(30, 58, 156, 0.12); }
+    </style>
+</head>
+<body class="bg-white">
+
+<!-- ============ ヘッダー ============ -->
+<header class="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-gray-100">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16">
+            <a href="/laipdf/" class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-brand-700 rounded-lg flex items-center justify-center text-white font-bold">L</div>
+                <span class="text-xl font-bold text-brand-900">LaiPDF</span>
+            </a>
+            <nav class="hidden md:flex items-center gap-8 text-sm">
+                <a href="#features" class="text-gray-700 hover:text-brand-700">機能一覧</a>
+                <a href="#use-cases" class="text-gray-700 hover:text-brand-700">利用シーン</a>
+                <a href="#pricing" class="text-gray-700 hover:text-brand-700">料金</a>
+                <a href="#support" class="text-gray-700 hover:text-brand-700">サポート</a>
+                <a href="#faq" class="text-gray-700 hover:text-brand-700">よくある質問</a>
+            </nav>
+            <div class="flex items-center gap-2">
+                <a href="mailto:info@laide.co.jp" class="hidden md:inline-block text-sm text-gray-700 border border-gray-300 rounded-lg px-3 py-2 hover:bg-gray-50">資料請求・お問い合わせ</a>
+                <a href="https://hub.salestree.online/download/laipdf" class="inline-flex items-center gap-1.5 bg-brand-700 hover:bg-brand-800 text-white text-sm font-medium rounded-lg px-3 py-2">
+                    無料体験版をダウンロード
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+                </a>
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- ============ ヒーロー ============ -->
+<section class="relative bg-gradient-to-br from-slate-50 to-brand-50/30 overflow-hidden">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
+        <div class="grid md:grid-cols-2 gap-10 items-center">
+            <div>
+                <div class="inline-block bg-white/70 border border-brand-100 text-brand-700 text-xs font-semibold rounded-full px-3 py-1 mb-5">
+                    Windows 向け PDF 編集ソフト
+                </div>
+                <h1 class="font-display text-5xl md:text-6xl font-extrabold leading-tight text-brand-900 mb-6">
+                    PDF作業を、<br>もっとシンプルに。
+                </h1>
+                <p class="text-gray-700 text-lg mb-8 leading-relaxed">
+                    押印・修正・結合・OCR まで、業務で必要な機能をこれ1本に。<br>
+                    中小企業の日常業務を、3クリックで完了します。
+                </p>
+
+                <!-- 3 特徴アイコン -->
+                <div class="grid grid-cols-3 gap-4 mb-10 max-w-md">
+                    <div class="text-center">
+                        <div class="w-14 h-14 mx-auto bg-white rounded-2xl shadow-sm flex items-center justify-center mb-2 text-brand-700">
+                            <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"/></svg>
+                        </div>
+                        <p class="text-xs font-semibold text-gray-900">ローカル完結</p>
+                        <p class="text-[10px] text-gray-500 mt-0.5">PDFは外部に送信されません</p>
+                    </div>
+                    <div class="text-center">
+                        <div class="w-14 h-14 mx-auto bg-white rounded-2xl shadow-sm flex items-center justify-center mb-2 text-brand-700">
+                            <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        </div>
+                        <p class="text-xs font-semibold text-gray-900">3クリックで完了</p>
+                        <p class="text-[10px] text-gray-500 mt-0.5">直感的で迷わない操作性</p>
+                    </div>
+                    <div class="text-center">
+                        <div class="w-14 h-14 mx-auto bg-white rounded-2xl shadow-sm flex items-center justify-center mb-2 text-brand-700">
+                            <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                        <p class="text-xs font-semibold text-gray-900">低コストで導入</p>
+                        <p class="text-[10px] text-gray-500 mt-0.5">中小企業にやさしい価格</p>
+                    </div>
+                </div>
+
+                <!-- CTA -->
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <a href="https://hub.salestree.online/download/laipdf" class="inline-flex items-center justify-center gap-2 bg-brand-700 hover:bg-brand-800 text-white font-semibold rounded-xl px-6 py-4 shadow-lg shadow-brand-700/20">
+                        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+                        <span>無料体験版をダウンロード</span>
+                        <span class="text-xs font-normal text-brand-100">30日間すべての機能が使えます</span>
+                    </a>
+                    <a href="#features" class="inline-flex items-center justify-center gap-1 border border-gray-300 hover:bg-gray-50 text-gray-800 font-medium rounded-xl px-6 py-4">
+                        機能を詳しく見る →
+                    </a>
+                </div>
+                <p class="text-xs text-gray-500 mt-3">※ Windows 10 / 11 (64bit) 対応</p>
+            </div>
+
+            <div class="relative">
+                <div class="bg-white rounded-2xl shadow-2xl p-3 border border-gray-100">
+                    <div class="bg-gray-100 rounded-lg p-2 mb-2 text-xs text-gray-500 flex items-center gap-1.5">
+                        <span class="w-2 h-2 bg-red-400 rounded-full"></span>
+                        <span class="w-2 h-2 bg-yellow-400 rounded-full"></span>
+                        <span class="w-2 h-2 bg-green-400 rounded-full"></span>
+                        <span class="ml-2 font-medium text-gray-700">LaiPDF v1.0.9</span>
+                        <span class="ml-auto text-gray-400">LaiPDF-manual.pdf</span>
+                    </div>
+                    <div class="aspect-[4/3] bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-sm">
+                        <div class="text-center">
+                            <div class="text-6xl font-display font-bold gradient-text mb-2">LaiPDF</div>
+                            <p>取扱説明書 / User Manual</p>
+                            <p class="text-xs mt-2">Version 1.0.9 ・ 株式会社 L'aide</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============ 悩み訴求 ============ -->
+<section class="bg-white py-16 md:py-20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 class="text-center text-3xl md:text-4xl font-bold mb-12">こんなお悩み、ありませんか？</h2>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div class="bg-gray-50 rounded-xl p-6 card-hover">
+                <div class="text-3xl mb-3">📝</div>
+                <p class="font-semibold mb-1">PDFに文字を書きたいだけなのに難しい…</p>
+                <p class="text-xs text-gray-500">簡単にテキストを追加したいだけなのに、操作がわかりにくい。</p>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-6 card-hover">
+                <div class="text-3xl mb-3">💰</div>
+                <p class="font-semibold mb-1">Adobe Acrobat は高すぎる</p>
+                <p class="text-xs text-gray-500">高機能すぎて使いこなせない。コストも負担になっている。</p>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-6 card-hover">
+                <div class="text-3xl mb-3">🔴</div>
+                <p class="font-semibold mb-1">印鑑を押したいだけなのに…</p>
+                <p class="text-xs text-gray-500">書類に印鑑を押すだけなのに、わざわざ別のツールを使っている。</p>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-6 card-hover">
+                <div class="text-3xl mb-3">📑</div>
+                <p class="font-semibold mb-1">PDFの結合・分割をすばやくしたい</p>
+                <p class="text-xs text-gray-500">ファイルの整理に時間がかかり、作業が非効率になっている。</p>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-6 card-hover">
+                <div class="text-3xl mb-3">🔍</div>
+                <p class="font-semibold mb-1">スキャン PDF から文字を読み取りたい</p>
+                <p class="text-xs text-gray-500">紙の資料をテキスト化して再利用したい。</p>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-6 card-hover">
+                <div class="text-3xl mb-3">☁️</div>
+                <p class="font-semibold mb-1">PDF をクラウドにアップしたくない</p>
+                <p class="text-xs text-gray-500">重要書類や社内資料を外部サービスに預けたくない。</p>
+            </div>
+        </div>
+        <p class="text-center text-xl md:text-2xl font-bold mt-12">
+            LaiPDFなら、日常業務で<span class="text-brand-700">本当に使う機能</span>を<span class="text-brand-700">シンプル</span>に提供します。
+        </p>
+    </div>
+</section>
+
+<!-- ============ LaiPDF でできること ============ -->
+<section id="features" class="bg-slate-50 py-16 md:py-20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 class="text-center text-3xl md:text-4xl font-bold mb-2">LaiPDFでできること</h2>
+        <p class="text-center text-gray-600 mb-12">日常業務に必要な機能を、直感的な操作で。</p>
+
+        <div class="grid md:grid-cols-3 gap-5">
+            <div class="bg-white rounded-2xl p-6 card-hover">
+                <div class="flex items-center gap-2 mb-3">
+                    <div class="w-10 h-10 bg-brand-50 rounded-lg flex items-center justify-center text-brand-700">📝</div>
+                    <h3 class="font-bold">テキスト追加・白塗り編集</h3>
+                </div>
+                <p class="text-sm text-gray-600">テキストを追加したり、白塗りで文字を隠して上から書き直しが可能。請求書や契約書の修正に。</p>
+            </div>
+            <div class="bg-white rounded-2xl p-6 card-hover">
+                <div class="flex items-center gap-2 mb-3">
+                    <div class="w-10 h-10 bg-brand-50 rounded-lg flex items-center justify-center text-brand-700">🔴</div>
+                    <h3 class="font-bold">印鑑・署名</h3>
+                </div>
+                <p class="text-sm text-gray-600">PNG 画像の印鑑を登録し、書類に押印できます。手書き署名の作成・配置もかんたん。</p>
+            </div>
+            <div class="bg-white rounded-2xl p-6 card-hover">
+                <div class="flex items-center gap-2 mb-3">
+                    <div class="w-10 h-10 bg-brand-50 rounded-lg flex items-center justify-center text-brand-700">📑</div>
+                    <h3 class="font-bold">PDF 結合・分割</h3>
+                </div>
+                <p class="text-sm text-gray-600">複数の PDF を結合したり、1 つの PDF をページ単位で分割できます。書類整理がラクに。</p>
+            </div>
+            <div class="bg-white rounded-2xl p-6 card-hover">
+                <div class="flex items-center gap-2 mb-3">
+                    <div class="w-10 h-10 bg-brand-50 rounded-lg flex items-center justify-center text-brand-700">🔍</div>
+                    <h3 class="font-bold">OCR 文字読取</h3>
+                </div>
+                <p class="text-sm text-gray-600">スキャン PDF や画像 PDF からテキストを読み取ります。日本語の書類も高精度で認識。</p>
+            </div>
+            <div class="bg-white rounded-2xl p-6 card-hover">
+                <div class="flex items-center gap-2 mb-3">
+                    <div class="w-10 h-10 bg-brand-50 rounded-lg flex items-center justify-center text-brand-700">🗂</div>
+                    <h3 class="font-bold">ページ整理</h3>
+                </div>
+                <p class="text-sm text-gray-600">ページの並び替え、削除、回転がサムネイル操作で直感的に行えます。</p>
+            </div>
+            <div class="bg-white rounded-2xl p-6 card-hover">
+                <div class="flex items-center gap-2 mb-3">
+                    <div class="w-10 h-10 bg-brand-50 rounded-lg flex items-center justify-center text-brand-700">🔒</div>
+                    <h3 class="font-bold">ローカル完結</h3>
+                </div>
+                <p class="text-sm text-gray-600">PDF は外部サーバーに送信されません。お客様の PC 内ですべて完結します。</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============ 3 ステップ ============ -->
+<section class="bg-white py-16 md:py-20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 class="text-center text-3xl md:text-4xl font-bold mb-2">3ステップで、カンタンに完了</h2>
+        <p class="text-center text-gray-600 mb-12">直感的な操作で、誰でもすぐに使えます。</p>
+
+        <div class="grid md:grid-cols-3 gap-6 items-stretch">
+            <div class="bg-slate-50 rounded-2xl p-6 text-center relative">
+                <div class="w-10 h-10 mx-auto bg-brand-700 text-white rounded-full font-bold flex items-center justify-center mb-3">1</div>
+                <h3 class="font-bold mb-2">ツールを選ぶ</h3>
+                <p class="text-sm text-gray-600">左のメニューから使いたい機能を選択</p>
+            </div>
+            <div class="bg-slate-50 rounded-2xl p-6 text-center relative">
+                <div class="w-10 h-10 mx-auto bg-brand-700 text-white rounded-full font-bold flex items-center justify-center mb-3">2</div>
+                <h3 class="font-bold mb-2">編集・配置する</h3>
+                <p class="text-sm text-gray-600">PDF 上をクリックやドラッグで編集・配置</p>
+            </div>
+            <div class="bg-slate-50 rounded-2xl p-6 text-center relative">
+                <div class="w-10 h-10 mx-auto bg-brand-700 text-white rounded-full font-bold flex items-center justify-center mb-3">3</div>
+                <h3 class="font-bold mb-2">保存する</h3>
+                <p class="text-sm text-gray-600">保存ボタンをクリックして PDF を出力</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============ 比較表 ============ -->
+<section class="bg-slate-50 py-16 md:py-20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 class="text-center text-3xl md:text-4xl font-bold mb-12">他の PDF ツールとの違い</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full bg-white rounded-2xl shadow-sm overflow-hidden text-sm">
+                <thead>
+                    <tr class="border-b border-gray-100">
+                        <th class="text-left p-4 font-semibold text-gray-700 w-1/4"></th>
+                        <th class="p-4 bg-brand-700 text-white font-bold">LaiPDF</th>
+                        <th class="p-4 text-gray-700 font-semibold">オンライン PDF ツール</th>
+                        <th class="p-4 text-gray-700 font-semibold">Adobe Acrobat</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    <tr>
+                        <td class="p-4 font-medium text-gray-700">外部サーバー送信</td>
+                        <td class="p-4 text-center text-brand-700 font-semibold">不要 (ローカル完結)</td>
+                        <td class="p-4 text-center text-gray-600">必要</td>
+                        <td class="p-4 text-center text-gray-600">不要 (ローカル)</td>
+                    </tr>
+                    <tr>
+                        <td class="p-4 font-medium text-gray-700">月額コスト</td>
+                        <td class="p-4 text-center text-brand-700 font-semibold">買い切り / 低価格</td>
+                        <td class="p-4 text-center text-gray-600">月額が安い場合が多い</td>
+                        <td class="p-4 text-center text-gray-600">高額 (月額制)</td>
+                    </tr>
+                    <tr>
+                        <td class="p-4 font-medium text-gray-700">動作速度</td>
+                        <td class="p-4 text-center text-brand-700 font-semibold">軽快</td>
+                        <td class="p-4 text-center text-gray-600">ネット環境に依存</td>
+                        <td class="p-4 text-center text-gray-600">重い場合がある</td>
+                    </tr>
+                    <tr>
+                        <td class="p-4 font-medium text-gray-700">印鑑・白塗り編集</td>
+                        <td class="p-4 text-center text-brand-700 font-semibold">対応</td>
+                        <td class="p-4 text-center text-gray-600">一部対応 / 制限あり</td>
+                        <td class="p-4 text-center text-gray-600">対応</td>
+                    </tr>
+                    <tr>
+                        <td class="p-4 font-medium text-gray-700">OCR (日本語)</td>
+                        <td class="p-4 text-center text-brand-700 font-semibold">対応</td>
+                        <td class="p-4 text-center text-gray-600">一部対応 / 制限あり</td>
+                        <td class="p-4 text-center text-gray-600">対応</td>
+                    </tr>
+                    <tr>
+                        <td class="p-4 font-medium text-gray-700">オフライン利用</td>
+                        <td class="p-4 text-center text-brand-700 font-semibold">可能</td>
+                        <td class="p-4 text-center text-gray-600">不可</td>
+                        <td class="p-4 text-center text-gray-600">可能</td>
+                    </tr>
+                    <tr>
+                        <td class="p-4 font-medium text-gray-700">初心者の使いやすさ</td>
+                        <td class="p-4 text-center text-brand-700 font-semibold">◎</td>
+                        <td class="p-4 text-center text-gray-600">○</td>
+                        <td class="p-4 text-center text-gray-600">△</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- ============ 業種別 ============ -->
+<section id="use-cases" class="bg-white py-16 md:py-20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 class="text-center text-3xl md:text-4xl font-bold mb-12">さまざまな業種・シーンで活躍</h2>
+        <div class="grid md:grid-cols-4 gap-4">
+            <div class="bg-slate-50 rounded-2xl p-6 border border-gray-100">
+                <div class="text-3xl mb-3">🏗</div>
+                <h3 class="font-bold mb-2">建設業</h3>
+                <ul class="text-xs text-gray-600 space-y-1">
+                    <li>・契約書の修正・押印</li>
+                    <li>・見積書の作成・整理</li>
+                    <li>・図面や資料の結合</li>
+                </ul>
+            </div>
+            <div class="bg-slate-50 rounded-2xl p-6 border border-gray-100">
+                <div class="text-3xl mb-3">🏢</div>
+                <h3 class="font-bold mb-2">不動産業</h3>
+                <ul class="text-xs text-gray-600 space-y-1">
+                    <li>・重要事項説明書の整理</li>
+                    <li>・契約書の押印</li>
+                    <li>・スキャン書類の OCR</li>
+                </ul>
+            </div>
+            <div class="bg-slate-50 rounded-2xl p-6 border border-gray-100">
+                <div class="text-3xl mb-3">⚖️</div>
+                <h3 class="font-bold mb-2">士業・コンサル</h3>
+                <ul class="text-xs text-gray-600 space-y-1">
+                    <li>・書類への注釈・修正</li>
+                    <li>・PDF の結合・分割</li>
+                    <li>・クライアントへの提出資料作成</li>
+                </ul>
+            </div>
+            <div class="bg-slate-50 rounded-2xl p-6 border border-gray-100">
+                <div class="text-3xl mb-3">💼</div>
+                <h3 class="font-bold mb-2">一般企業（バックオフィス）</h3>
+                <ul class="text-xs text-gray-600 space-y-1">
+                    <li>・請求書の修正・発行</li>
+                    <li>・稟議書、申請書の整理</li>
+                    <li>・社内資料の PDF 化</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============ 料金 ============ -->
+<section id="pricing" class="bg-slate-50 py-16 md:py-20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 class="text-center text-3xl md:text-4xl font-bold mb-2">料金プラン</h2>
+        <p class="text-center text-gray-600 mb-12">使い方に合わせて 3 プランをご用意。すべて 1 ライセンスにつき 3 台まで利用可能。</p>
+
+        <div class="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            <div class="bg-white rounded-2xl p-7 border border-gray-100 card-hover">
+                <h3 class="font-bold text-lg mb-1">月額プラン</h3>
+                <p class="text-xs text-gray-500 mb-4">気軽に始めたい方向け</p>
+                <div class="flex items-baseline mb-4">
+                    <span class="text-4xl font-extrabold text-brand-900">¥1,500</span>
+                    <span class="text-gray-500 ml-1">/ 月 (税別)</span>
+                </div>
+                <p class="text-xs text-gray-500 mb-5">いつでも解約可能</p>
+                <ul class="text-sm space-y-2 mb-6">
+                    <li class="flex items-start gap-2"><span class="text-brand-700">✓</span>1 ライセンス 3 台まで</li>
+                    <li class="flex items-start gap-2"><span class="text-brand-700">✓</span>全機能利用可</li>
+                    <li class="flex items-start gap-2"><span class="text-brand-700">✓</span>自動アップデート</li>
+                    <li class="flex items-start gap-2"><span class="text-brand-700">✓</span>メールサポート</li>
+                </ul>
+                <a href="https://hub.salestree.online/buy/laipdf" class="block text-center bg-white border-2 border-brand-700 text-brand-700 hover:bg-brand-50 font-semibold rounded-xl py-3">月額プランを購入</a>
+            </div>
+
+            <div class="bg-white rounded-2xl p-7 border-2 border-brand-700 card-hover relative">
+                <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand-700 text-white text-xs font-bold px-3 py-1 rounded-full">おすすめ</div>
+                <h3 class="font-bold text-lg mb-1">年額プラン</h3>
+                <p class="text-xs text-gray-500 mb-4">長く使うならお得</p>
+                <div class="flex items-baseline mb-4">
+                    <span class="text-4xl font-extrabold text-brand-900">¥15,000</span>
+                    <span class="text-gray-500 ml-1">/ 年 (税別)</span>
+                </div>
+                <p class="text-xs text-green-600 font-semibold mb-5">月額換算 ¥1,250 ・ ¥3,000 お得</p>
+                <ul class="text-sm space-y-2 mb-6">
+                    <li class="flex items-start gap-2"><span class="text-brand-700">✓</span>1 ライセンス 3 台まで</li>
+                    <li class="flex items-start gap-2"><span class="text-brand-700">✓</span>全機能利用可</li>
+                    <li class="flex items-start gap-2"><span class="text-brand-700">✓</span>自動アップデート</li>
+                    <li class="flex items-start gap-2"><span class="text-brand-700">✓</span>メールサポート</li>
+                </ul>
+                <a href="https://hub.salestree.online/buy/laipdf" class="block text-center bg-brand-700 hover:bg-brand-800 text-white font-semibold rounded-xl py-3">年額プランを購入</a>
+            </div>
+
+            <div class="bg-white rounded-2xl p-7 border border-gray-100 card-hover">
+                <h3 class="font-bold text-lg mb-1">買い切りプラン</h3>
+                <p class="text-xs text-gray-500 mb-4">追加費用なしで永続利用</p>
+                <div class="flex items-baseline mb-4">
+                    <span class="text-4xl font-extrabold text-brand-900">¥29,800</span>
+                    <span class="text-gray-500 ml-1">(税別)</span>
+                </div>
+                <p class="text-xs text-gray-500 mb-5">1 回のみのお支払い</p>
+                <ul class="text-sm space-y-2 mb-6">
+                    <li class="flex items-start gap-2"><span class="text-brand-700">✓</span>1 ライセンス 3 台まで</li>
+                    <li class="flex items-start gap-2"><span class="text-brand-700">✓</span>全機能利用可</li>
+                    <li class="flex items-start gap-2"><span class="text-brand-700">✓</span>自動アップデート</li>
+                    <li class="flex items-start gap-2"><span class="text-brand-700">✓</span>メールサポート</li>
+                </ul>
+                <a href="https://hub.salestree.online/buy/laipdf" class="block text-center bg-white border-2 border-brand-700 text-brand-700 hover:bg-brand-50 font-semibold rounded-xl py-3">買い切りを購入</a>
+            </div>
+        </div>
+
+        <p class="text-center text-xs text-gray-500 mt-6">表示価格は税別です。決済時に消費税が加算されます。</p>
+    </div>
+</section>
+
+<!-- ============ 最後の CTA ============ -->
+<section id="support" class="bg-gradient-to-br from-brand-700 to-brand-900 text-white py-16 md:py-20">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <h2 class="text-3xl md:text-4xl font-bold mb-3">今すぐ、LaiPDF を無料で体験</h2>
+        <p class="text-brand-100 mb-8">30 日間の無料体験で、その違いをお試しいただけます。</p>
+
+        <a href="https://hub.salestree.online/download/laipdf" class="inline-flex items-center gap-2 bg-white text-brand-900 hover:bg-brand-50 font-bold rounded-xl px-8 py-4 shadow-lg">
+            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+            無料体験版をダウンロード
+        </a>
+
+        <div class="grid md:grid-cols-3 gap-4 mt-10 text-sm">
+            <div>✓ 30 日間すべての機能が使えます</div>
+            <div>✓ クレジットカード登録不要</div>
+            <div>✓ インストールは簡単・1 分で完了</div>
+        </div>
+    </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section id="faq" class="bg-white py-16 md:py-20">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 class="text-center text-3xl md:text-4xl font-bold mb-12">よくある質問</h2>
+        <div class="space-y-4">
+            <details class="bg-slate-50 rounded-xl p-5 group">
+                <summary class="cursor-pointer font-semibold flex items-center justify-between">
+                    <span>Mac や Linux でも使えますか？</span>
+                    <span class="group-open:rotate-180 transition-transform">▾</span>
+                </summary>
+                <p class="text-sm text-gray-600 mt-3">現在は Windows 10 / 11 (64bit) のみ対応しています。Mac 版は今後の対応を検討中です。</p>
+            </details>
+            <details class="bg-slate-50 rounded-xl p-5 group">
+                <summary class="cursor-pointer font-semibold flex items-center justify-between">
+                    <span>編集した PDF はどこに保存されますか？</span>
+                    <span class="group-open:rotate-180 transition-transform">▾</span>
+                </summary>
+                <p class="text-sm text-gray-600 mt-3">お客様の PC 内に保存されます。LaiPDF は完全ローカル動作のため、PDF データが当社や外部サーバーに送信されることはありません。</p>
+            </details>
+            <details class="bg-slate-50 rounded-xl p-5 group">
+                <summary class="cursor-pointer font-semibold flex items-center justify-between">
+                    <span>解約は簡単にできますか？</span>
+                    <span class="group-open:rotate-180 transition-transform">▾</span>
+                </summary>
+                <p class="text-sm text-gray-600 mt-3">月額・年額プランは、次回更新日の 7 日前までにメール (info@laide.co.jp) でご連絡いただければ解約可能です。</p>
+            </details>
+            <details class="bg-slate-50 rounded-xl p-5 group">
+                <summary class="cursor-pointer font-semibold flex items-center justify-between">
+                    <span>領収書や請求書は発行できますか？</span>
+                    <span class="group-open:rotate-180 transition-transform">▾</span>
+                </summary>
+                <p class="text-sm text-gray-600 mt-3">決済完了後、自動的に Stripe より領収書がメールで発行されます。インボイス対応の領収書も自動発行可能です。</p>
+            </details>
+            <details class="bg-slate-50 rounded-xl p-5 group">
+                <summary class="cursor-pointer font-semibold flex items-center justify-between">
+                    <span>1 ライセンスで何台まで使えますか？</span>
+                    <span class="group-open:rotate-180 transition-transform">▾</span>
+                </summary>
+                <p class="text-sm text-gray-600 mt-3">1 ライセンスにつき同時 3 台までインストール可能です。例：会社の PC と自宅の PC、ノート PC など。</p>
+            </details>
+            <details class="bg-slate-50 rounded-xl p-5 group">
+                <summary class="cursor-pointer font-semibold flex items-center justify-between">
+                    <span>アップデートは無料ですか？</span>
+                    <span class="group-open:rotate-180 transition-transform">▾</span>
+                </summary>
+                <p class="text-sm text-gray-600 mt-3">はい、すべてのプランで自動アップデートが無料で利用できます。新機能や不具合修正が自動的に反映されます。</p>
+            </details>
+        </div>
+    </div>
+</section>
+
+<!-- ============ フッター ============ -->
+<footer class="bg-brand-900 text-brand-100 py-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid md:grid-cols-3 gap-8">
+            <div>
+                <div class="flex items-center gap-2 mb-3">
+                    <div class="w-8 h-8 bg-white text-brand-900 rounded-lg flex items-center justify-center font-bold">L</div>
+                    <span class="text-xl font-bold text-white">LaiPDF</span>
+                </div>
+                <p class="text-sm">PDF作業を、もっとシンプルに。</p>
+                <p class="text-xs text-brand-200 mt-3">© 2026 株式会社L'aide</p>
+            </div>
+            <div>
+                <h4 class="text-white font-semibold mb-3 text-sm">製品</h4>
+                <ul class="text-sm space-y-2">
+                    <li><a href="#features" class="hover:text-white">機能一覧</a></li>
+                    <li><a href="#pricing" class="hover:text-white">料金プラン</a></li>
+                    <li><a href="https://hub.salestree.online/download/laipdf" class="hover:text-white">ダウンロード</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="text-white font-semibold mb-3 text-sm">運営会社</h4>
+                <ul class="text-sm space-y-2">
+                    <li><a href="https://laide.co.jp/" class="hover:text-white">株式会社L'aide</a></li>
+                    <li><a href="mailto:info@laide.co.jp" class="hover:text-white">お問い合わせ</a></li>
+                    <li><a href="/laipdf/terms.html" class="hover:text-white">利用規約</a></li>
+                    <li><a href="/laipdf/privacy.html" class="hover:text-white">プライバシーポリシー</a></li>
+                    <li><a href="/laipdf/commerce-law.html" class="hover:text-white">特定商取引法に基づく表示</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</footer>
+
+</body>
+</html>
