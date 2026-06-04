@@ -54,11 +54,10 @@
                 <div class="w-8 h-8 bg-brand-700 rounded-lg flex items-center justify-center text-white font-bold">L</div>
                 <span class="text-xl font-bold text-brand-900">LaiPDF</span>
             </a>
-            <nav class="hidden md:flex items-center gap-8 text-sm">
+            <nav class="hidden md:flex items-center gap-7 text-sm">
                 <a href="#features" class="text-gray-700 hover:text-brand-700">機能一覧</a>
-                <a href="#use-cases" class="text-gray-700 hover:text-brand-700">利用シーン</a>
                 <a href="#pricing" class="text-gray-700 hover:text-brand-700">料金</a>
-                <a href="#support" class="text-gray-700 hover:text-brand-700">サポート</a>
+                <a href="#install" class="text-gray-700 hover:text-brand-700">インストール</a>
                 <a href="#faq" class="text-gray-700 hover:text-brand-700">よくある質問</a>
             </nav>
             <div class="flex items-center gap-2">
@@ -434,6 +433,68 @@
         </div>
 
         <p class="text-center text-xs text-gray-500 mt-6">表示価格は税別です。決済時に消費税が加算されます。</p>
+    </div>
+</section>
+
+<!-- ============ インストール手順 ============ -->
+<section id="install" class="bg-white py-16 md:py-20">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 class="text-center text-3xl md:text-4xl font-bold mb-3">インストール手順</h2>
+        <p class="text-center text-gray-600 mb-12">
+            ダウンロード後、初回起動時に Windows のセキュリティ警告が表示されます。<br>
+            下記の手順で簡単にインストールできます。
+        </p>
+
+        <div class="grid md:grid-cols-2 gap-6">
+            <!-- STEP 1 -->
+            <div class="bg-slate-50 rounded-2xl overflow-hidden border border-gray-100">
+                <div class="p-5 pb-3">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-brand-700 text-white rounded-full font-bold flex items-center justify-center">1</div>
+                        <h3 class="font-bold text-lg">インストーラーを実行</h3>
+                    </div>
+                    <p class="text-sm text-gray-700">
+                        ダウンロードした <code class="bg-white border border-gray-200 rounded px-1.5 py-0.5 text-xs">LaiPDF-x.x.x-setup.exe</code> をダブルクリックして実行します。
+                    </p>
+                    <p class="text-sm text-gray-700 mt-2">
+                        「<strong>Windows によって PC が保護されました</strong>」という青い画面が表示されたら、
+                        画面内の <strong class="text-brand-700">「詳細情報」</strong> をクリックします。
+                    </p>
+                </div>
+                <div class="bg-white border-t border-gray-100 p-3">
+                    <img src="assets/install-step-1.png" alt="STEP 1: 詳細情報をクリック" class="w-full h-auto rounded-lg block" loading="lazy">
+                </div>
+            </div>
+
+            <!-- STEP 2 -->
+            <div class="bg-slate-50 rounded-2xl overflow-hidden border border-gray-100">
+                <div class="p-5 pb-3">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-brand-700 text-white rounded-full font-bold flex items-center justify-center">2</div>
+                        <h3 class="font-bold text-lg">「実行」をクリック</h3>
+                    </div>
+                    <p class="text-sm text-gray-700">
+                        画面下部に <strong class="text-brand-700">「実行」</strong> ボタンが表示されるのでクリックします。
+                    </p>
+                    <p class="text-sm text-gray-700 mt-2">
+                        インストールが完了すると、デスクトップに <strong>LaiPDF のショートカット</strong>が作成されます。<br>
+                        ダブルクリックで起動し、初回認証画面でメールアドレスとライセンスキーを入力してください。
+                    </p>
+                </div>
+                <div class="bg-white border-t border-gray-100 p-3">
+                    <img src="assets/install-step-2.png" alt="STEP 2: 実行をクリック" class="w-full h-auto rounded-lg block" loading="lazy">
+                </div>
+            </div>
+        </div>
+
+        <!-- 補足 -->
+        <div class="mt-8 bg-brand-50 border border-brand-100 rounded-xl p-5 text-sm text-brand-900">
+            <p class="font-semibold mb-1">💡 「詳細情報」が表示される理由</p>
+            <p class="text-gray-700">
+                LaiPDF は中小企業向けの自社配布アプリのため、Microsoft の電子署名（EV コードサイニング証明書）を取得していません。そのため Windows が初回のみ警告を表示しますが、ソフトウェア自体は安全です。
+                インストール後の動作には影響ありません。
+            </p>
+        </div>
     </div>
 </section>
 
